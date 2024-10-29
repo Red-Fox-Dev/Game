@@ -1,7 +1,7 @@
-import pygame
 from enum import Enum
 from typing import Dict
-
+from unit import Unit, UnitType
+import pygame
 class BuildingType(Enum):
     TOWER = 1
     BARRACKS = 2
@@ -29,3 +29,7 @@ class Building:
         color = (0, 0, 255)  # Color for buildings (e.g., blue)
         pygame.draw.rect(surface, color, 
                          (self.x * tile_size, self.y * tile_size, tile_size, tile_size))
+
+    def produce_unit(self, unit_type: UnitType):
+        new_unit = Unit(unit_type, self.x, self.y, self.player)
+        return new_unit

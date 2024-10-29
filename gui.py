@@ -1,7 +1,7 @@
 import pygame
 from typing import Dict
 from button import Button
-from unit import Unit  
+from unit import Unit, UnitType 
 from building import BuildingType
 
 # Constants
@@ -12,10 +12,10 @@ class GUI:
     def __init__(self, game):
         self.game = game
         self.action_buttons: Dict[str, Button] = {}
-        self.create_buttons()
         self.mode = "normal"
         self.font = pygame.font.Font(None, 24)
         self.title_font = pygame.font.Font(None, 32)
+        self.create_buttons()
 
     def create_buttons(self):
         self.update_button_positions()
@@ -36,12 +36,11 @@ class GUI:
         }
 
     def draw_sidebar(self):
-        self.update_button_positions()  # Update button positions before drawing
         sidebar_width = 200
         sidebar_rect = pygame.Rect(self.game.screen_width - sidebar_width, 0, sidebar_width, self.game.screen_height)
         pygame.draw.rect(self.game.screen, GRAY, sidebar_rect)
 
-        # Draw buttons
+        # Draw action buttons
         for action, button in self.action_buttons.items():
             button.draw(self.game.screen)
 
@@ -59,7 +58,21 @@ class GUI:
             ]
             for i, text in enumerate(stats_text):
                 surface = self.font.render(text, True, WHITE)
-                self.game.screen.blit(surface, (self.game.screen_width - sidebar_width + 10, 350 + i * 25))  # Adjust position
+                self.game.screen.blit(surface, (self.game.screen_width - sidebar_width + 10, 350 + i * 25))
+
+        if self.game.selected_building:
+            building_info = self.game.selected_building.get_info()
+            title = self.title_font.render(building_info["name"], True, WHITE)
+            self.game.screen.blit(title, (self.game.screen_width - sidebar_width + 10, 300))
+
+            # Add produce button if building is a Tower
+            if self.game.selected_building.building_type == BuildingType.TOWER:
+                produce_soldier_button = Button(self.game.screen_width - sidebar_width + 10, 250, self.button_width, self.button_height, "Produce Soldier")
+                produce_soldier_button.draw(self.game.screen)
+
+                # Produce Archer button
+                produce_archer_button = Button(self.game.screen_width - sidebar_width + 10, 300, self.button_width, self.button_height, "Produce Archer")
+                produce_archer_button.draw(self.game.screen)
 
     def draw_game_info(self):
         player_color = (0, 0, 255) if self.game.current_player == 1 else (255, 0, 0)
@@ -88,7 +101,7 @@ class GUI:
 
     def handle_button_events(self, event) -> bool:
         for action, button in self.action_buttons.items():
-            if button.handle_event(event):  # Assuming Button class has a handle_event method
+            if button.handle_event(event):
                 if action == "move":
                     self.mode = "move"
                 elif action == "attack":
@@ -101,15 +114,36 @@ class GUI:
                     self.mode = "normal"
                 elif action == "cancel":
                     self.game.selected_unit = None
+                    self.game.selected_building = None
                     self.mode = "normal"
                 elif action == "end_turn":
                     self.game.end_turn()
                     self.game.selected_unit = None
+                    self.game.selected_building = None
                     self.mode = "normal"
                 elif action == "build":
                     if self.game.selected_unit:
                         self.mode = "build"  # Set to build mode
                 return True
+
+        # Handle produce button for Tower
+        if self.game.selected_building and self.game.selected_building.building_type == BuildingType.TOWER:
+            # Check if Produce Soldier button is clicked
+            produce_soldier_button = Button(self.game.screen_width - 200 + 10, 250, self.button_width, self.button_height, "Produce Soldier")
+            if produce_soldier_button.handle_event(event):
+                new_unit = self.game.selected_building.produce_unit(UnitType.SOLDIER)
+                self.game.units.append(new_unit)
+                self.mode = "normal"
+                return True
+
+            # Check if Produce Archer button is clicked
+            produce_archer_button = Button(self.game.screen_width - 200 + 10, 300, self.button_width, self.button_height, "Produce Archer")
+            if produce_archer_button.handle_event(event):
+                new_unit = self.game.selected_building.produce_unit(UnitType.ARCHER)
+                self.game.units.append(new_unit)
+                self.mode = "normal"
+                return True
+
         return False
 
     def handle_events(self):

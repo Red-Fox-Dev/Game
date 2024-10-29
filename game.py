@@ -19,42 +19,43 @@ BUILDING_OUTLINE_COLOR = (0, 0, 128)  # Outline color for buildings
 
 class Game:
     def __init__(self):
-        # Set initial screen size
         self.screen_width, self.screen_height = 1900, 1024  # Default window size
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.RESIZABLE)
         pygame.display.set_caption("What war?")
         self.clock = pygame.time.Clock()
 
-        # Calculate TILE_SIZE based on screen size
         self.update_grid_size()
 
         self.units: List[Unit] = []
         self.buildings: List[Building] = []
         self.selected_unit: Optional[Unit] = None
+        self.selected_building: Optional[Building] = None
         self.current_player = 1
         self.turn = 1
         
         self.gui = GUI(self)
+        self.initialize_units()
 
-        # Initialize units
+    def update_grid_size(self):
+        self.screen_width, self.screen_height = self.screen.get_size()
+        self.tile_size = min(self.screen_width // (GRID_WIDTH + 1), self.screen_height // GRID_HEIGHT)
+
+    def initialize_units(self):
         self.units.append(Unit(UnitType.SOLDIER, 0, 1, 1))
         self.units.append(Unit(UnitType.ARCHER, 1, 2, 1))
         self.units.append(Unit(UnitType.SOLDIER, GRID_WIDTH - 2, GRID_HEIGHT - 2, 2))
         self.units.append(Unit(UnitType.ARCHER, GRID_WIDTH - 1, GRID_HEIGHT - 1, 2))
 
-    def update_grid_size(self):
-        # Update tile size based on current screen size
-        self.screen_width, self.screen_height = self.screen.get_size()
-        self.tile_size = min(self.screen_width // (GRID_WIDTH + 1), self.screen_height // GRID_HEIGHT)
-
-        # Adjust the grid size to fit next to the sidebar
-        self.grid_width = GRID_WIDTH * self.tile_size
-        self.grid_height = GRID_HEIGHT * self.tile_size
-
     def get_unit_at(self, x: int, y: int) -> Optional[Unit]:
         for unit in self.units:
             if unit.x == x and unit.y == y:
                 return unit
+        return None
+
+    def get_building_at(self, x: int, y: int) -> Optional[Building]:
+        for building in self.buildings:
+            if building.x == x and building.y == y:
+                return building
         return None
 
     def is_valid_move(self, unit: Unit, x: int, y: int) -> bool:
@@ -66,26 +67,32 @@ class Game:
         for unit in self.units:
             unit.moved = False
             unit.attacked = False
-    
+
     def handle_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
-            
-            if event.type == pygame.VIDEORESIZE:  # Handle window resize
-                self.update_grid_size()
-                self.gui.update_button_positions()  # Update button positions
 
-            if self.gui.handle_button_events(event):
-                continue  # If a GUI button was clicked, skip the rest.
+            if event.type == pygame.VIDEORESIZE:  
+                self.update_grid_size()
+                self.gui.update_button_positions()  # เรียกฟังก์ชันจาก GUI
+
+            # Handle button events first
+            if self.gui.handle_button_events(event):  # ใช้ self.gui แทน self
+                continue  # Skip the rest if a button was pressed
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 x = event.pos[0] // self.tile_size
                 y = event.pos[1] // self.tile_size
 
                 clicked_unit = self.get_unit_at(x, y)
+                clicked_building = self.get_building_at(x, y)
+
                 if clicked_unit and clicked_unit.player == self.current_player:
                     self.selected_unit = clicked_unit
+
+                elif clicked_building and clicked_building.player == self.current_player:
+                    self.selected_building = clicked_building
 
                 if self.gui.mode == "move" and self.selected_unit:
                     if self.is_valid_move(self.selected_unit, x, y):
@@ -105,8 +112,8 @@ class Game:
 
                 elif self.gui.mode == "build" and self.selected_unit:
                     self.create_building(BuildingType.TOWER, x, y, self.current_player)
-                    self.selected_unit = None  # Deselect unit after building
-                    self.gui.mode = "normal"  # Switch back to normal mode
+                    self.selected_unit = None  
+                    self.gui.mode = "normal"  
 
         return True
 
@@ -158,14 +165,10 @@ class Game:
                 building_rect = pygame.Rect(building.x * self.tile_size, building.y * self.tile_size, self.tile_size, self.tile_size)
 
                 # Set building color based on player
-                if building.player == 1:
-                    building_color = PLAYER_1_BUILDING_COLOR
-                else:
-                    building_color = PLAYER_2_BUILDING_COLOR
+                building_color = PLAYER_1_BUILDING_COLOR if building.player == 1 else PLAYER_2_BUILDING_COLOR
 
                 pygame.draw.rect(self.screen, building_color, building_rect)  # Draw building color
                 pygame.draw.rect(self.screen, BUILDING_OUTLINE_COLOR, building_rect, 2)  # Draw building outline
-                
                 
                 font = pygame.font.Font(None, 24)
                 text_surface = font.render("Tower", True, WHITE)
@@ -202,5 +205,3 @@ class Game:
         new_building = Building(building_type, x, y, player)
         self.buildings.append(new_building)  
         print(f"Building created at ({x}, {y}) by player {player}")
-
-
