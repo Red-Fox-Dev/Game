@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Dict
-from unit import Unit, UnitType
 import pygame
+from unit import Unit, UnitType
 
 # กำหนดประเภทของอาคาร
 class BuildingType(Enum):
@@ -11,32 +11,32 @@ class BuildingType(Enum):
 # คลาสสำหรับอาคาร
 class Building:
     def __init__(self, building_type: BuildingType, x: int, y: int, player: int):
-        # กำหนดค่าพื้นฐานของอาคาร
-        self.building_type = building_type  # ประเภทของอาคาร
-        self.x = x  # ตำแหน่ง x ของอาคาร
-        self.y = y  # ตำแหน่ง y ของอาคาร
-        self.player = player  # ผู้เล่นที่เป็นเจ้าของอาคาร
+        self.building_type = building_type
+        self.x = x
+        self.y = y
+        self.player = player
+        self.rect = pygame.Rect(x * 50, y * 50, 50, 50)  # กำหนด rect สำหรับการตรวจสอบการชน
 
     def get_info(self) -> Dict:
-        # คืนค่าข้อมูลเกี่ยวกับอาคาร
         if self.building_type == BuildingType.TOWER:
             return {
-                "name": "Tower",  # ชื่อของอาคาร
-                "description": "Defensive structure",  # คำอธิบาย
+                "name": "Tower",
+                "description": "Defensive structure",
             }
         elif self.building_type == BuildingType.BARRACKS:
             return {
-                "name": "Barracks",  # ชื่อของอาคาร
-                "description": "Training unit structure",  # คำอธิบาย
+                "name": "Barracks",
+                "description": "Training unit structure",
             }
 
-    def draw(self, surface, tile_size):
-        # วาดอาคารลงบนหน้าจอ
+    def draw(self, surface):
         color = (0, 0, 255)  # สีของอาคาร (เช่น สีน้ำเงิน)
-        pygame.draw.rect(surface, color, 
-                         (self.x * tile_size, self.y * tile_size, tile_size, tile_size))  # วาดสี่เหลี่ยมตามตำแหน่งและขนาด
+        pygame.draw.rect(surface, color, self.rect)  # วาดสี่เหลี่ยมตามตำแหน่งและขนาด
 
     def produce_unit(self, unit_type: UnitType):
-        # สร้างยูนิตใหม่จากอาคาร
         new_unit = Unit(unit_type, self.x, self.y, self.player)  # สร้างยูนิตใหม่ที่ตำแหน่งและผู้เล่นเดียวกับอาคาร
         return new_unit  # คืนค่ายูนิตใหม่
+
+class Tower(Building):
+    def __init__(self, x: int, y: int, player: int):
+        super().__init__(BuildingType.TOWER, x, y, player)
