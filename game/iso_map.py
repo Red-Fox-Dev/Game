@@ -13,6 +13,7 @@ class IsometricMap:
         self.selected_tile = None
         self.objects = []  # เพิ่มลิสต์สำหรับเก็บ objects
 
+
     def add_object(self, obj):
         self.objects.append(obj)
 

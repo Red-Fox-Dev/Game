@@ -12,6 +12,7 @@ import math
 from .player import Player
 
 class Game:
+    """คลาสหลักของเกมที่จัดการลูปของเกมและการแสดงผล"""
     def __init__(self, config: GameConfig):
         pygame.init()
         self.config = config
@@ -25,11 +26,11 @@ class Game:
         self.last_time = pygame.time.get_ticks()
         self.walkable_tiles = []
         self.capture_points = []  # list เก็บจุดยึดครอง
-        self.players = [Player("Player 1", starting_money=250), Player("Player 2", starting_money=250)]
+        self.player_money = [250, 250]  # เงินของผู้เล่น 2 คน
+        self.unit_idle_frames = self.load_unit_idle_frames()  # โหลดเฟรมของยูนิต
         self.generate_capture_points(5)  # สร้างจุดยึดครองเริ่มต้น 5 จุด
-        self.current_player_index = 0  # ใช้เพื่อระบุผู้เล่นปัจจุบัน
-        self.current_round = 1  # ตัวแปรสำหรับเก็บรอบปัจจุบัน
-        
+        self.current_player = 0  # เพิ่มตัวแปรเพื่อเก็บข้อมูลผู้เล่นที่กำลังเล่นอยู่
+
         self.unit_idle_spritesheet = pygame.image.load("assets/sprites/unit2_idle_blue.png").convert_alpha()
         self.unit_idle_frames = []
         frame_width = 32  # กว้างของแต่ละเฟรม
@@ -39,22 +40,40 @@ class Game:
             frame = self.unit_idle_spritesheet.subsurface((i * frame_width, 0, frame_width, frame_height))
             self.unit_idle_frames.append(frame)
 
-        # สร้าง Unit สำหรับ Player 1 และ Player 2
-        self.create_starting_units_for_players()
+        # กำหนดยูนิตเริ่มต้นที่ตำแหน่งที่ต้องการ
+        start_x, start_y = 5, 5  # กำหนดตำแหน่งเริ่มต้นที่ต้องการ
+        self.unit = Unit(self.unit_idle_frames, start_x, start_y)
+        self.iso_map.add_object(self.unit)
 
+        # สร้างยูนิตสำหรับผู้เล่น 2 คน
+        self.units = []
+        self.create_initial_units()
+
+        self.current_turn = 0  # 0 สำหรับ Player 1, 1 สำหรับ Player 2
+        self.round = 1
+
+    def create_initial_units(self):
+        """สร้างยูนิตเริ่มต้นสำหรับผู้เล่น 2 คน"""
+        player_positions = [(5, 5), (10, 5)]  # กำหนดตำแหน่งเริ่มต้นสำหรับผู้เล่น 1 และ 2
+        for i, pos in enumerate(player_positions):
+            unit = Unit(self.unit_idle_frames, pos[0], pos[1], owner=i)  # กำหนด owner เป็น i
+            self.units.append(unit)  # เพิ่มยูนิตลงใน self.units
+            self.iso_map.add_object(unit)  # เพิ่มยูนิตลงในแผนที่
+
+    def load_unit_idle_frames(self):
+        # ฟังก์ชันในการโหลดเฟรม idle ของยูนิต
+        # ตัวอย่างการโหลดภาพ
+        return [pygame.image.load("./assets/sprites/unit1_idle_red.png"),
+                pygame.image.load("./assets/sprites/unit1_idle_blue.png")]
+     
     def generate_capture_points(self, count):
         """สร้างจุดยึดครองเริ่มต้น"""
-        valid_positions = []
-        for x in range(self.iso_map.tmx_data.width):
-            for y in range(self.iso_map.tmx_data.height):
-                if self.path_finder.is_walkable((x, y)):
-                    valid_positions.append((x, y))
+        for _ in range(count):
+            x = random.randint(0, self.iso_map.tmx_data.width - 1)
+            y = random.randint(0, self.iso_map.tmx_data.height - 1)
+            value = random.randint(1, 10)  # ตัวอย่างการตั้งค่า value
+            self.capture_points.append(CapturePoint(x, y, value, self.unit_idle_frames))  # ส่ง unit_idle_frames
 
-        if valid_positions:
-            positions = random.sample(valid_positions, min(count, len(valid_positions)))
-            for x, y in positions:
-                value = random.randint(5, 15)  # สุ่มค่าเงินที่จะได้รับต่อวินาที
-                self.capture_points.append(CapturePoint(x, y, value))
     def draw_capture_point_info(self):
         """วาดข้อมูลเกี่ยวกับจุดยึดครอง"""
         for point in self.capture_points:
@@ -72,39 +91,36 @@ class Game:
             status_surface = self.debug_font.render(status_text, True, (255, 255, 255))
             self.screen.blit(status_surface, (screen_x, screen_y - 45))  # ปรับตำแหน่งตามต้องการ
     
-    def draw_round_display(self):
-        """แสดงรอบปัจจุบันที่มุมขวาบนของหน้าจอ"""
-        round_text = self.debug_font.render(f"Round: {self.current_round}", True, (255, 215, 0))  # ข้อความสีทอง
-        text_rect = round_text.get_rect(topright=(self.config.SCREEN_WIDTH - 10, 10))  # ปรับให้ติดขอบขวาและห่างจากขอบบน 10 pixels
-        self.screen.blit(round_text, text_rect)
+    def draw_money(self):
+        font = pygame.font.Font(None, 36)  # กำหนดฟอนต์
+        for i, money in enumerate(self.player_money):
+            money_text = font.render(f"Player {i + 1} Money: {money}", True, (255, 255, 255))
+            self.screen.blit(money_text, (10, 10 + i * 30))  # ปรับตำแหน่งตามต้องการ
 
-    def switch_player(self):
-        self.current_player_index = (self.current_player_index + 1) % len(self.players)
-    
-    def get_current_player(self):
-        return self.players[self.current_player_index]
-    
-    def draw_money_display(self):
-        """แสดงจำนวนเงินของผู้เล่นปัจจุบันบนหน้าจอ"""
-        current_player = self.get_current_player()
-        money_text = self.debug_font.render(f"{current_player.name} Money: ${current_player.money}", True, (255, 215, 0))
-        self.screen.blit(money_text, (10, self.config.SCREEN_HEIGHT - 40))
+    def draw_money_display(self): 
+        """แสดงจำนวนเงินบนหน้าจอ""" 
+        for i, money in enumerate(self.player_money): 
+            money_text = self.debug_font.render(f"Player {i + 1} Money: ${money}", True, (255, 215, 0)) 
+            self.screen.blit(money_text, (10, self.config.SCREEN_HEIGHT - (40 + (30 * i)))) 
 
-        # แสดงจำนวนจุดที่ยึดได้
-        captured_points = sum(1 for point in self.capture_points if point.owner == current_player.name)
+        # แสดงจำนวนจุดที่ยึดได้ 
+        captured_points = sum(1 for point in self.capture_points if point.owner is not None) 
         points_text = self.debug_font.render(f"Captured Points: {captured_points}/{len(self.capture_points)}", 
-                                   True, (255, 215, 0))
-        self.screen.blit(points_text, (10, self.config.SCREEN_HEIGHT - 70))
+                                          True, (255, 215, 0)) 
+        self.screen.blit(points_text, (10, self.config.SCREEN_HEIGHT - (70 + (30 * len(self.player_money)))))   
 
-    def update_capture_points(self):
-        """อัพเดทจุดยึดครองและรับเงินสำหรับผู้เล่นแต่ละคน"""
-        current_time = pygame.time.get_ticks()
-        for point in self.capture_points:
-            income = point.update(self.iso_map.objects, current_time)
+    def update_capture_points(self): 
+        """อัพเดทจุดยึดครองและรับเงิน""" 
+        current_time = pygame.time.get_ticks() 
+        for point in self.capture_points: 
+            income = point.update(self.iso_map.objects, current_time) 
             if point.owner is not None:
-                player = next((p for p in self.players if p.name == point.owner), None)
-                if player:
-                    player.update_money
+                if point.owner in self.units:
+                    player_index = self.units.index(point.owner)
+                    self.player_money[player_index] += income  # เพิ่มเงินให้ผู้เล่นนั้น
+                    print(f"Player {player_index} income updated: {income}")  # ตรวจสอบค่า income
+                else:
+                    print(f"Warning: Owner {point.owner} not found in units list.")
 
     def get_walkable_tiles(self, unit, max_distance=5):
         """หาช่องที่สามารถเดินไปได้ในระยะที่กำหนด"""
@@ -134,14 +150,6 @@ class Game:
                         queue.append((new_pos, dist + 1))
         
         return walkable
-
-    def end_turn(self):
-        """สิ้นสุดเทิร์นของผู้เล่นปัจจุบันและสลับไปยังผู้เล่นถัดไป"""
-        current_player = self.get_current_player()
-        current_player.money += 100  # เพิ่มเงินให้ผู้เล่น 100 ในแต่ละเทิร์น
-        self.switch_player()  # สลับผู้เล่น
-        if self.current_player_index == 0:  # หากกลับมาที่ผู้เล่น 1
-            self.current_round += 1  # เพิ่มรอบ
 
     def draw_walkable_tiles(self):
         """วาด highlight ช่องที่สามารถเดินได้แบบโปร่งแสง"""
@@ -177,43 +185,15 @@ class Game:
                 # วาด highlight_surface ลงบนหน้าจอหลัก
                 self.screen.blit(highlight_surface, (screen_x, screen_y))
 
-    def create_starting_units_for_players(self):
-        """สร้างยูนิตเริ่มต้น 2 ตัวสำหรับผู้เล่นแต่ละคน"""
-        # สร้างยูนิตสำหรับ Player 1
-        player_1_start_positions = [(5, 5), (6, 5)]  # ตัวอย่างตำแหน่งเริ่มต้นของ Player 1
-        for pos in player_1_start_positions:
-            new_unit = self.create_unit_at_position(pos[0], pos[1])
-            self.players[0].add_unit(new_unit)
 
-        # สร้างยูนิตสำหรับ Player 2
-        player_2_start_positions = [(24, 25), (25, 25)]  # ตัวอย่างตำแหน่งเริ่มต้นของ Player 2
-        for pos in player_2_start_positions:
-            new_unit = self.create_unit_at_position(pos[0], pos[1])
-            self.players[1].add_unit(new_unit)
-
-    def create_unit_at_position(self, x, y):
-        """สร้างยูนิตใหม่ที่ตำแหน่งที่กำหนด"""
-        new_unit = Unit(self.unit_idle_frames, x, y)  # ส่ง frames ที่มีกรอบภาพไปที่ Unit
-        self.iso_map.add_object(new_unit)
-        return new_unit
-                
-    def create_unit(self, x, y):
-        """สร้าง unit ใหม่ที่ตำแหน่งที่กำหนด"""
-        new_unit = Unit(self.unit_idle_frames, x, y)  # ส่ง x และ y ไปยัง Unit
-        self.iso_map.add_object(new_unit)
-        return new_unit
+    def create_initial_units(self):
+        """สร้างยูนิตเริ่มต้นสำหรับผู้เล่น 2 คน"""
+        player_positions = [(5, 5), (10, 5)]  # กำหนดตำแหน่งเริ่มต้นสำหรับผู้เล่น 1 และ 2
+        for pos in player_positions:
+            unit = Unit(self.unit_idle_frames, pos[0], pos[1])
+            self.units.append(unit)  # เพิ่มยูนิตลงใน self.units
+            self.iso_map.add_object(unit)  # เพิ่มยูนิตลงในแผนที่
     
-    def add_unit_at_mouse(self):
-        """เพิ่มยูนิตที่ตำแหน่งเมาส์สำหรับผู้เล่นปัจจุบัน"""
-        mouse_x, mouse_y = pygame.mouse.get_pos()
-        tile_x, tile_y = self.iso_map.get_tile_coord_from_screen(
-            mouse_x, mouse_y, self.camera, self.camera.zoom)
-        
-        if 0 <= tile_x < self.iso_map.tmx_data.width and 0 <= tile_y < self.iso_map.tmx_data.height:
-            if self.path_finder.is_walkable((tile_x, tile_y)):
-                new_unit = self.create_unit(tile_x, tile_y)
-                self.get_current_player().add_unit(new_unit)
-
     def draw_map(self):
         """วาดแผนที่ไอโซเมตริกพร้อมการชดเชยจากกล้องและการซูม"""
         # วาดแผนที่พื้นฐาน
@@ -256,6 +236,7 @@ class Game:
         if self.selected_unit:
             self.draw_unit_highlight(self.selected_unit)
 
+
     def draw_unit_highlight(self, unit):
         """วาดเส้นไฮไลท์รอบ unit ที่ถูกเลือก"""
         iso_x, iso_y = self.iso_map.cart_to_iso(unit.x, unit.y)
@@ -288,6 +269,25 @@ class Game:
         
         # วาดเส้นรอบไฮไลท์ของกระเบื้อง
         pygame.draw.lines(self.screen, (255, 255, 0), True, points, 2)
+
+    def draw_turn_info(self):
+        """วาดข้อมูลเกี่ยวกับ turn และ round บนหน้าจอ"""
+        turn_text = self.debug_font.render(f"Turn: Player {self.current_player + 1}", True, (255, 255, 255))
+        round_text = self.debug_font.render(f"Round: {self.round}", True, (255, 255, 255))
+    
+        # คำนวณตำแหน่ง
+        screen_width = self.screen.get_width()
+        turn_x = screen_width - turn_text.get_width() - 10  # 10 พิกเซลจากขอบ
+        round_x = screen_width - round_text.get_width() - 10  # 10 พิกเซลจากขอบ
+
+        self.screen.blit(turn_text, (turn_x, 10))  # วางที่มุมขวาบน
+        self.screen.blit(round_text, (round_x, 30))  # วางที่มุมขวาบน
+
+    def update(self):
+        # อัปเดตเฉพาะยูนิตของผู้เล่นที่กำลังเล่นอยู่
+        for obj in self.iso_map.objects:
+            if isinstance(obj, Unit) and obj.owner == self.current_turn:
+                obj.update(delta_time)  # อัปเดตยูนิตของผู้เล่นที่กำลังเล่นอยู่
 
     def update_selected_tile(self):
         """อัปเดตกระเบื้องที่ถูกเลือกตามตำแหน่งเมาส์"""
@@ -325,33 +325,37 @@ class Game:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_TAB:  # ใช้ปุ่ม TAB เพื่อสลับผู้เล่น
                     self.switch_player()
+                elif event.key == pygame.K_RETURN:  # ใช้ปุ่ม Enter เป็นปุ่ม "End Turn"
+                    self.end_turn()  # เรียกใช้ฟังก์ชันสิ้นสุดเทิร์น
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_x, mouse_y = pygame.mouse.get_pos()
+
                 if event.button == 1:  # คลิกซ้าย
                     # ตรวจสอบว่าคลิกที่ปุ่ม End Turn หรือไม่
                     button_x = self.config.SCREEN_WIDTH - 160  # ปรับให้ตรงกับตำแหน่งปุ่ม
                     button_y = self.config.SCREEN_HEIGHT - 60  # ปรับให้ตรงกับตำแหน่งปุ่ม
                     if (button_x <= mouse_x <= button_x + 150) and (button_y <= mouse_y <= button_y + 50):
                         self.end_turn()  # เรียกใช้ฟังก์ชันสิ้นสุดเทิร์น
-                tile_x, tile_y = self.iso_map.get_tile_coord_from_screen(
-                   mouse_x, mouse_y, self.camera, self.camera.zoom)
-
-                if event.button == 1:  # คลิกซ้าย
-                    # เลือก unit
-                    found_unit = False
-                    for obj in self.iso_map.objects:
-                        if isinstance(obj, Unit) and int(obj.x) == tile_x and int(obj.y) == tile_y:
-                            self.selected_unit = obj
-                            # อัพเดตช่องที่เดินได้
-                            self.walkable_tiles = self.get_walkable_tiles(obj)
-                            found_unit = True
-                            break
-                        
-                    if not found_unit:
-                        self.selected_unit = None
-                        self.walkable_tiles = []
+                    else:
+                        # เลือก unit
+                        tile_x, tile_y = self.iso_map.get_tile_coord_from_screen(
+                            mouse_x, mouse_y, self.camera, self.camera.zoom)
+                        found_unit = False
+                        for obj in self.iso_map.objects:
+                            if isinstance(obj, Unit) and int(obj.x) == tile_x and int(obj.y) == tile_y:
+                                self.selected_unit = obj
+                                # อัพเดตช่องที่เดินได้
+                                self.walkable_tiles = self.get_walkable_tiles(obj)
+                                found_unit = True
+                                break
+                    
+                        if not found_unit:
+                            self.selected_unit = None
+                            self.walkable_tiles = []
 
                 elif event.button == 3 and self.selected_unit:  # คลิกขวา
+                    tile_x, tile_y = self.iso_map.get_tile_coord_from_screen(
+                        mouse_x, mouse_y, self.camera, self.camera.zoom)
                     if (tile_x, tile_y) in self.walkable_tiles:  # เช็คว่าเดินไปได้
                         self.selected_unit.set_destination(tile_x, tile_y, self.path_finder)
                         self.walkable_tiles = []  # ล้าง highlight หลังจากสั่งเดิน
@@ -373,35 +377,67 @@ class Game:
                 self.iso_map.remove_object(obj)
                 break
     
-    def draw_end_turn_button(self):
-        """วาดปุ่ม End Turn ที่มุมขวาล่างของหน้าจอ"""
-        button_width = 150
-        button_height = 50
-        button_x = self.config.SCREEN_WIDTH - button_width - 10  # ห่างจากขอบขวา 10 pixels
-        button_y = self.config.SCREEN_HEIGHT - button_height - 10  # ห่างจากขอบล่าง 10 pixels
+    def draw_end_turn_button(self): 
+        """วาดปุ่ม End Turn ที่มุมขวาล่างของหน้าจอ""" 
+        button_width = 150 
+        button_height = 50 
+        button_x = self.config.SCREEN_WIDTH - button_width - 10  # ห่างจากขอบขวา 10 pixels 
+        button_y = self.config.SCREEN_HEIGHT - button_height - 10  # ห่างจากขอบล่าง 10 pixels 
 
-        # ตรวจสอบว่ามีการเลื่อนเมาส์มาที่ปุ่มหรือไม่
-        mouse_x, mouse_y = pygame.mouse.get_pos()
-        if (button_x <= mouse_x <= button_x + button_width) and (button_y <= mouse_y <= button_y + button_height):
-            button_color = (255, 100, 100)  # เปลี่ยนสีเมื่อเลื่อนเมาส์มาที่ปุ่ม
-        else:
-            button_color = (255, 0, 0)  # สีปกติ
+        # ตรวจสอบว่ามีการเลื่อนเมาส์มาที่ปุ่มหรือไม่ 
+        mouse_x, mouse_y = pygame.mouse.get_pos() 
+        if (button_x <= mouse_x <= button_x + button_width) and (button_y <= mouse_y <= button_y + button_height): 
+            button_color = (255, 100, 100)  # เปลี่ยนสีเมื่อเลื่อนเมาส์มาที่ปุ่ม 
+        else: 
+            button_color = (255, 0, 0)  # สีปกติ 
 
-        # วาดปุ่ม
-        pygame.draw.rect(self.screen, button_color, (button_x, button_y, button_width, button_height))  # วาดปุ่ม
-        button_text = self.debug_font.render("End Turn", True, (255, 255, 255))  # ข้อความสีขาว
-        text_rect = button_text.get_rect(center=(button_x + button_width // 2, button_y + button_height // 2))
-        self.screen.blit(button_text, text_rect)
+        # วาดปุ่ม 
+        pygame.draw.rect(self.screen, button_color, (button_x, button_y, button_width, button_height))  # วาดปุ่ม 
+        button_text = self.debug_font.render("End Turn", True, (255, 255, 255))  # ข้อความสีขาว 
+        text_rect = button_text.get_rect(center=(button_x + button_width // 2, button_y + button_height // 2)) 
+        self.screen.blit(button_text, text_rect) 
+
+    def end_turn(self):
+        """จัดการการสิ้นสุดของเทิร์น"""
+        income = 0
+        for capture_point in self.capture_points:
+            income += capture_point.update(self.iso_map.objects, pygame.time.get_ticks())
+    
+        # เพิ่มเงินให้กับผู้เล่นที่เป็นเจ้าของจุดยึดครอง
+        if capture_point.owner is not None:
+            self.player_money[self.current_player] += income
+
+        # เปลี่ยนไปยังผู้เล่นคนถัดไป
+        self.current_player = (self.current_player + 1) % len(self.player_money)
+
+        # แสดงผลเงินของผู้เล่น
+        print(f"Player 1 Money: {self.player_money[0]}")
+        print(f"Player 2 Money: {self.player_money[1]}")
+    
+        # รีเซ็ตสถานะการเพิ่มเงินสำหรับผู้เล่นทั้งสอง
+        self.money_added_this_round = [False, False]
+
+        # เพิ่มเงินให้กับผู้เล่นที่กำลังเล่นอยู่
+        if not self.money_added_this_round[self.current_player]:
+            self.player_money[self.current_player] += 100  # หรือจำนวนเงินที่ต้องการเพิ่ม
+            self.money_added_this_round[self.current_player] = True
+
+        # เพิ่มค่ารอบเมื่อผู้เล่นคนที่สองทำการสิ้นสุดรอบ
+        if self.current_player == 0:  # ถ้าผู้เล่นคนที่สอง (player 2) เป็นคนที่กำลังเล่นอยู่
+            self.round += 1  # เพิ่มค่ารอบ
+        
 
     def run(self):
         """ลูปหลักของเกม"""
         
         running = True
         while running:
+            self.update_capture_points()  # เรียกใช้งานที่นี่
+            self.draw_money_display()  # เรียกใช้งานที่นี่
             delta_time = self.clock.tick(self.config.FPS) / 1000.0
             running = self.handle_events()
             events = pygame.event.get()
-
+            
                     # อัพเดตสถานะของยูนิต
             for obj in self.iso_map.objects:
                 if isinstance(obj, Unit):  # ตรวจสอบว่า obj เป็น Unit หรือไม่
@@ -409,10 +445,11 @@ class Game:
 
             for event in events:
                 if event.type == pygame.QUIT:
-                    running = False
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
-                        running = False
+                    pygame.quit()
+                    return
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_RETURN:  # ใช้ปุ่ม Enter เป็นปุ่ม "End Turn"
+                        self.end_turn()  # เรียกใช้ฟังก์ชันสิ้นสุดเทิร์น
             
             
             keys = pygame.key.get_pressed()
@@ -423,17 +460,20 @@ class Game:
             self.update_selected_tile()
                 # อัพเดทสถานะเกม
 
+            self.update_capture_points()
+            
             # วาดฉากของเกม
             self.screen.fill((0, 0, 0))
+            self.update()  # อัปเดตยูนิตตาม turn
             self.draw_map()
             self.draw_debug_info()
             self.draw_money_display()  # เรียกใช้ฟังก์ชันแสดงจำนวนเงิน
-            self.draw_round_display()  # เรียกใช้ฟังก์ชันแสดงผลรอบ
-            self.draw_end_turn_button()  # วาดปุ่ม End Turn
+            self.draw_turn_info()  # วาดข้อมูล turn และ round
+            self.draw_end_turn_button()
             pygame.display.flip()
-        
+            
             # รักษาอัตราเฟรมเรต
             self.clock.tick(self.config.FPS)
             
-        
+
         pygame.quit()

@@ -1,16 +1,50 @@
 import pygame
+import math
+
 class GameObject:
     def __init__(self, x, y, image, properties=None):
         self.x = x
         self.y = y
+        self.target_x = x
+        self.target_y = y
         self.image = image
         self.properties = properties or {}
-        self.hp = 100  # เพิ่ม HP
-        self.max_hp = 100  # กำหนดค่า max HP
-        self.selected = False  # ตัวแปรที่จะบอกว่า unit นี้ถูกเลือกหรือไม่
+        self.path = []
+        self.speed = 1  # ความเร็วในการเคลื่อนที่
+        self.moving = False
+
+    def set_destination(self, x, y, path_finder):
+        """กำหนดจุดหมายและหาเส้นทาง"""
+        self.path = path_finder.find_path((int(self.x), int(self.y)), (x, y))
+        if self.path:
+            self.path.pop(0)  # ลบตำแหน่งปัจจุบันออก
+            self.moving = True
+
+    def update(self, delta_time):
+        """อัพเดทตำแหน่งของ object"""
+        if self.path and self.moving:
+            next_pos = self.path[0]
+            target_x, target_y = next_pos
+
+            # คำนวณระยะทางที่ต้องเคลื่อนที่
+            dx = target_x - self.x
+            dy = target_y - self.y
+            distance = math.sqrt(dx * dx + dy * dy)
+
+            if distance < 0.1:  # ถึงจุดหมายย่อยแล้ว
+                self.x = target_x
+                self.y = target_y
+                self.path.pop(0)
+                if not self.path:  # ถึงจุดหมายสุดท้าย
+                    self.moving = False
+            else:
+                # เคลื่อนที่ไปยังจุดหมายถัดไป
+                move_x = (dx / distance) * self.speed * delta_time
+                move_y = (dy / distance) * self.speed * delta_time
+                self.x += move_x
+                self.y += move_y
 
     def draw(self, screen, iso_map, camera, config):
-        # แปลงตำแหน่งของยูนิตจากพิกัดคาร์ทิเซียนเป็นไอโซเมตริก
         iso_x, iso_y = iso_map.cart_to_iso(self.x, self.y)
         screen_x = iso_x * camera.zoom + config.OFFSET_X + camera.position.x
         screen_y = iso_y * camera.zoom + config.OFFSET_Y + camera.position.y
@@ -23,32 +57,4 @@ class GameObject:
         else:
             scaled_image = self.image
 
-        # วาดยูนิต
         screen.blit(scaled_image, (screen_x, screen_y))
-
-        # ถ้ายูนิตถูกเลือก ให้วาด HP bar
-        if self.selected:
-            self.draw_hp_bar(screen, screen_x, screen_y, camera)
-
-    def take_damage(self, amount):
-        """ลด HP ของ unit"""
-        self.hp -= amount
-        if self.hp <= 0:
-            self.destroy()
-
-    def destroy(self):
-        """ลบ unit เมื่อ HP เป็นศูนย์"""
-        # ลบ unit จากแผนที่
-        self.iso_map.remove_object(self)
-
-    def draw_hp_bar(self, screen, x, y, camera):
-        """แสดง HP bar"""
-        hp_bar_width = 50  # กำหนดความกว้างของ HP bar
-        hp_bar_height = 8  # ความสูงของ HP bar
-        hp_percentage = self.hp / self.max_hp  # คำนวณเปอร์เซ็นต์ HP
-
-        # วาดพื้นหลังของ HP bar (สีเทา)
-        pygame.draw.rect(screen, (100, 100, 100), (x, y - 10, hp_bar_width, hp_bar_height))
-
-        # วาด HP bar ที่มีความยาวตามเปอร์เซ็นต์ของ HP
-        pygame.draw.rect(screen, (255, 0, 0), (x, y - 10, hp_bar_width * hp_percentage, hp_bar_height))

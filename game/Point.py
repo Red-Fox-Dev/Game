@@ -1,56 +1,66 @@
 import pygame
 import math
+from .Unit import Unit
 class CapturePoint:
-    def __init__(self, x, y, value=10):
-        self.x = x
-        self.y = y
+    def __init__(self, x, y, value, unit_idle_frames, owner=None):
+        self.unit_idle_frames = unit_idle_frames
+        self.idle_frame_index = 0
         self.value = value
-        self.owner = None
-        self.capture_progress = 0
-        self.capture_speed = 1
-        self.income_interval = 1000
-        self.last_income_time = pygame.time.get_ticks()
-        
+        self.idle_frame_duration = 100  # ระยะเวลาในการแสดงเฟรม (มิลลิวินาที)
+        self.last_frame_update_time = pygame.time.get_ticks()
+        self.x = x  # กำหนดตำแหน่งเริ่มต้น
+        self.y = y  # กำหนดตำแหน่งเริ่มต้น
+        self.image = self.unit_idle_frames[0]
+        self.path = []
+        self.moving = False
+        self.speed = 1
+        self.owner = owner  # กำหนด owner
+
         # โหลด sprites
         self.neutral_sprite = pygame.image.load("assets/crystal_mine_nocap.png").convert_alpha()
         self.captured_sprite = pygame.image.load("assets/bluel_mine_cap.png").convert_alpha()
         self.current_sprite = self.neutral_sprite
-        
+
         # ปรับขนาด sprite (ถ้าจำเป็น)
         self.sprite_size = (32, 32)  # ปรับขนาดตามต้องการ
         self.neutral_sprite = pygame.transform.scale(self.neutral_sprite, self.sprite_size)
         self.captured_sprite = pygame.transform.scale(self.captured_sprite, self.sprite_size)
-        
+
         # เอฟเฟกต์การกะพริบ
         self.pulse_speed = 0.005
         self.alpha = 255
 
-    def update(self, game_objects, current_time):
-        unit_on_point = False
-        for obj in game_objects:
-            if int(obj.x) == self.x and int(obj.y) == self.y:
-                unit_on_point = True
-                if self.owner != obj:
-                    self.capture_progress += self.capture_speed
-                    if self.capture_progress >= 100:
-                        self.owner = obj
-                        self.current_sprite = self.captured_sprite
-                        self.capture_progress = 100
-                break
+        # กำหนดค่าเริ่มต้นสำหรับ capture_progress
+        self.capture_progress = 0  # เพิ่มบรรทัดนี้เพื่อกำหนดค่าเริ่มต้น
+        self.capture_speed = 1  # คุณอาจต้องกำหนด capture_speed ด้วย
 
-        if not unit_on_point:
-            self.capture_progress = max(0, self.capture_progress - self.capture_speed)
-            if self.capture_progress == 0:
-                self.owner = None
-                self.current_sprite = self.neutral_sprite
+    def update(self, game_objects, current_time): 
+        unit_on_point = False 
+        for obj in game_objects: 
+            if isinstance(obj, Unit):  # ตรวจสอบว่า obj เป็น Unit หรือไม่ 
+                if int(obj.x) == self.x and int(obj.y) == self.y: 
+                    unit_on_point = True 
+                    if self.owner != obj: 
+                        self.capture_progress += self.capture_speed 
+                        if self.capture_progress >= 100: 
+                            # ตรวจสอบว่า obj มีอยู่ใน units list หรือไม่
+                            if obj in game_objects:  # หรือ self.owner ใน self.units
+                                self.owner = obj  # ตั้งเจ้าของ 
+                                self.current_sprite = self.captured_sprite 
+                                self.capture_progress = 100 
+                            else:
+                                print(f"Warning: Owner {obj} not found in units list.")
+                    break 
+        # ลดความก้าวหน้าหากไม่มียูนิตอยู่ 
+        if not unit_on_point: 
+            self.capture_progress = max(0, self.capture_progress - self.capture_speed) 
+            if self.capture_progress == 0: 
+                self.owner = None 
+                self.current_sprite = self.neutral_sprite 
 
-        # อัพเดทค่า alpha สำหรับเอฟเฟกต์กะพริบ
-        self.alpha = abs(math.sin(pygame.time.get_ticks() * self.pulse_speed)) * 55 + 200
+        # ส่งกลับค่า income 
+        return self.value if self.owner is not None else 0  # ส่งกลับค่า value ถ้ามีเจ้าของ 
 
-        if self.owner and current_time - self.last_income_time >= self.income_interval:
-            return self.value
-            self.last_income_time = current_time
-        return 0
     def draw(self, screen, iso_map, camera, config):
         # คำนวณตำแหน่งบนหน้าจอ
         iso_x, iso_y = iso_map.cart_to_iso(self.x, self.y)
