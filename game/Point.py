@@ -1,16 +1,17 @@
 import pygame
 import math
 from .Unit import Unit
+
 class CapturePoint:
     def __init__(self, x, y, value=10):
         self.x = x
         self.y = y
         self.value = value  # เงินต่อวินาที
         self.owner = None
-        self.value = 100  # ตัวอย่างค่า value ของจุดยึดครอง
+        self.value = 50  # ตัวอย่างค่า value ของจุดยึดครอง
         self.has_received_income = False  # สถานะว่าได้รับเงินในเทิร์นนี้หรือยัง
         self.capture_progress = 0
-        self.capture_speed = 1
+        self.capture_speed = 5
         self.income_interval = 1000  # ทุกๆ 1 วินาที
         self.last_income_time = pygame.time.get_ticks()
         
@@ -120,10 +121,3 @@ class CapturePoint:
             progress_width = int(bar_width * (self.capture_progress / 100))
             pygame.draw.rect(screen, (0, 255, 0), 
                            (bar_x, bar_y, progress_width, bar_height))
-
-        # วาดค่าเงินต่อวินาที
-        font = pygame.font.Font(None, int(20 * camera.zoom))
-        value_text = font.render(f"+{self.value}/turn", True, (255, 255, 255))
-        text_rect = value_text.get_rect(center=(screen_x + scaled_size[0]//2, 
-                                          screen_y - 10))
-        screen.blit(value_text, text_rect)

@@ -121,11 +121,10 @@ class Unit:
 
     def perform_action(self, action_type):
         """ตรวจสอบว่ายูนิตสามารถทำ action ได้หรือไม่"""
-        if not self.has_actioned:
+        if not self.has_actioned:  # ตรวจสอบว่ายูนิตยังไม่ทำการแอคชั่นในเทิร์นนี้
             self.has_actioned = True  # ตั้งค่าสถานะว่าได้ทำ action ไปแล้ว
             return True  # อนุญาตให้ทำ action
-        else:
-            return False  # ไม่อนุญาตให้ทำ action
+        return False  # ไม่อนุญาตให้ทำ action
 
     def set_action_text(self, text):
         """ตั้งค่าข้อความการกระทำ"""

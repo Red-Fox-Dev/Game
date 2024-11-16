@@ -36,8 +36,6 @@ class Game:
         self.create_tower_button = None
         self.towers = []
         self.tower_created = [False, False]
-        self.soldier_button = None
-        self.archer_button = None
         self.unit_creation_button = None  # ปุ่มสำหรับสร้างยูนิต
         self.unit_type_to_create = None  # ประเภทของยูนิตที่จะสร้าง
         self.GRID_WIDTH = self.iso_map.tmx_data.width  # จำนวนช่องในแนวนอนจาก TMX
@@ -73,19 +71,27 @@ class Game:
             frame = self.unit_idle_spritesheet.subsurface((i * frame_width, 0, frame_width, frame_height))
             self.unit_idle_frames.append(frame)
 
+        # กำหนดตำแหน่งและขนาดของปุ่ม
+        button_width = 120
+        button_height = 50
+        button_x = 10  # ตำแหน่ง x ของปุ่ม
+        button_y_archer = 10  # ตำแหน่ง y ของปุ่ม Archer
+        button_y_soldier = button_y_archer + button_height + 10  # ตำแหน่ง y ของปุ่ม Soldier
+
+        self.archer_button = pygame.Rect(button_x, button_y_archer, button_width, button_height)  # กำหนดตำแหน่งและขนาดของปุ่ม Archer
+        self.soldier_button = pygame.Rect(button_x, button_y_soldier, button_width, button_height)  # กำหนดตำแหน่งและขนาดของปุ่ม Soldier
+        self.end_turn_button = pygame.Rect(config.SCREEN_WIDTH - button_width - 10, config.SCREEN_HEIGHT - button_height - 10, button_width, button_height)
+        self.move_button = pygame.Rect(self.end_turn_button.x, self.end_turn_button.y - button_height - 10, button_width, button_height)
+        self.attack_button = pygame.Rect(self.move_button.x, self.move_button.y - button_height - 10, button_width, button_height)
+        self.font = pygame.font.Font("./assets/Fonts/PixgamerRegular-OVD6A.ttf", 28)
+
         # สร้างยูนิตสำหรับผู้เล่น 1 และ 2
         self.units = []  # ลิสต์สำหรับเก็บยูนิตทั้งหมด
         self.player_units = []  # ลิสต์สำหรับเก็บยูนิตของผู้เล่น
         self.create_player_units()
 
         self.current_turn = 0
-        button_width = 120
-        button_height = 50
-        self.end_turn_button = pygame.Rect(config.SCREEN_WIDTH - button_width - 10, config.SCREEN_HEIGHT - button_height - 10, button_width, button_height)
-        self.move_button = pygame.Rect(self.end_turn_button.x, self.end_turn_button.y - button_height - 10, button_width, button_height)
-        self.attack_button = pygame.Rect(self.move_button.x, self.move_button.y - button_height - 10, button_width, button_height)
-        self.font = pygame.font.Font("./assets/Fonts/PixgamerRegular-OVD6A.ttf", 28)
-    
+     
     def end_turn(self):
         """จบเทิร์นและรีเซ็ตสถานะ"""
         # เพิ่มเงินให้กับผู้เล่นที่จบเทิร์นจากจุดยึดครอง
@@ -486,50 +492,43 @@ class Game:
             print("ไม่สามารถสร้างยูนิตได้: ทาวเวอร์ไม่ถูกเลือก.")
             return False
 
-        # ตรวจสอบว่า tower มีแอตทริบิวต์ owner
-        if not hasattr(tower, 'owner'):
-            print("ไม่สามารถสร้างยูนิตได้: ทาวเวอร์ไม่มีแอตทริบิวต์ owner.")
-            return False
-
-        print(f"กำลังสร้างยูนิต: {unit_type} ที่ {tower.x}, {tower.y}")
-
         # รับข้อมูลเจ้าของของทาวเวอร์
         player_index = tower.owner
 
-        # คำนวณตำแหน่งใหม่ของยูนิตที่จะอยู่ข้างๆ ทาวเวอร์
-        x = tower.x + 1   # ปรับตำแหน่ง X ให้ยูนิตอยู่ทางขวาของ Tower
-        y = tower.y        # ปรับตำแหน่ง Y ให้อยู่ที่เดียวกับ Tower
+        # ดึงค่าใช้จ่ายสำหรับยูนิตประเภทที่เลือก
+        unit_cost = UnitType.get_cost(unit_type)
 
-        # ตรวจสอบว่าตำแหน่งยูนิตใหม่อยู่ภายในขอบเขตของหน้าจอ
-        if x < 0 or x > self.config.SCREEN_WIDTH or y < 0 or y > self.config.SCREEN_HEIGHT:
-            print("ไม่สามารถสร้างยูนิตได้: ตำแหน่งนอกขอบเขตของหน้าจอ.")
+        # ตรวจสอบว่าผู้เล่นมีเงินเพียงพอในการสร้างยูนิตหรือไม่
+        if self.player_money[player_index] < unit_cost:
+            print(f"ผู้เล่น {player_index + 1} ไม่มีเงินเพียงพอในการสร้างยูนิตประเภท {unit_type}. ต้องการ {unit_cost}.")
             return False
 
-        # โหลดเฟรม idle สำหรับยูนิตที่ถูกสร้างตามเจ้าของ
-        sprite_path = None
+        # คำนวณตำแหน่งใหม่ของยูนิตที่จะอยู่ข้างๆ ทาวเวอร์
+        x = tower.x +  1   # ปรับตำแหน่ง X ให้ยูนิตอยู่ทางขวาของ Tower
+        y = tower.y        # ปรับตำแหน่ง Y ให้อยู่ที่เดียวกับ Tower
+
+        # กำหนดสีหรือสไปรต์ตามผู้เล่น
         if unit_type == UnitType.SOLDIER:
             sprite_path = "assets/sprites/unit1_idle_blue.png" if player_index == 0 else "assets/sprites/unit1_idle_red.png"
         elif unit_type == UnitType.ARCHER:
             sprite_path = "assets/sprites/unit2_idle_blue.png" if player_index == 0 else "assets/sprites/unit2_idle_red.png"
-        else:
-            print("ประเภทยูนิตไม่รู้จัก.")
-            return False
 
-        # โหลดสไปรต์และตรวจสอบความสำเร็จ
-        try:
-            unit_idle_spritesheet = pygame.image.load(sprite_path).convert_alpha()
-            unit_idle_frames = self.load_idle_frames(unit_idle_spritesheet)
-        except Exception as e:
-            print(f"ไม่สามารถโหลดสไปรต์ได้: {e}")
-            return False
+        # โหลดเฟรม idle สำหรับยูนิตที่ถูกสร้าง
+        unit_idle_spritesheet = pygame.image.load(sprite_path).convert_alpha()
+        unit_idle_frames = self.load_idle_frames(unit_idle_spritesheet)
 
         # สร้างยูนิตใหม่ที่ตำแหน่ง (x, y) ที่คำนวณไว้
         new_unit = Unit(unit_idle_frames, unit_type, x, y, owner=player_index)  # ส่ง owner ให้กับ constructor
 
-        # ไม่ต้องเพิ่มยูนิตใหม่ลงในลิสต์
-        print("ยูนิตถูกสร้างอยู่ที่ตำแหน่ง:", (x, y))
-    
-        return True  # คืนค่าความสำเร็จในการสร้างยูนิต
+        # เพิ่มยูนิตใหม่ลงในลิสต์ของผู้เล่น
+        self.player_units.append(new_unit)  # เพิ่มยูนิตใหม่ลงในลิสต์ของผู้เล่น
+        self.iso_map.add_object(new_unit)  # เพิ่มยูนิตลงในแผนที่
+
+        # หักค่าใช้จ่ายจากเงินของผู้เล่น
+        self.player_money[player_index] -= unit_cost
+
+        print(f"ยูนิตถูกสร้างอยู่ที่ตำแหน่ง: ({x}, {y}) สำหรับผู้เล่น {player_index + 1}. ค่าใช้จ่าย: {unit_cost}")  # แสดงข้อมูลเจ้าของยูนิต
+        return True
 
     def is_tower_at_position(self, x, y):
         """ตรวจสอบว่ามี Tower อยู่ที่ตำแหน่งที่กำหนดหรือไม่"""
@@ -539,46 +538,46 @@ class Game:
         return False
 
     def create_tower(self, x, y):
-        """สร้าง Tower ที่ตำแหน่งที่กำหนด""" 
-        player_index = self.current_turn  # ใช้ current_turn เพื่อระบุผู้เล่น 
+        """สร้าง Tower ที่ตำแหน่งที่กำหนด"""
+        player_index = self.current_turn  # ใช้ current_turn เพื่อระบุผู้เล่น
 
-        if self.tower_created[player_index]: 
-            print(f"Player {player_index + 1} can only create one tower per turn.") 
-            return False  # ไม่อนุญาตให้สร้าง Tower อีก 
+        if self.tower_created[player_index]:
+            print(f"Player {player_index + 1} can only create one tower per turn.")
+            return False  # ไม่อนุญาตให้สร้าง Tower อีก
 
-        # ตรวจสอบว่าผู้เล่นมีเงินเพียงพอหรือไม่ 
-        if self.player_money[player_index] < 100: 
-            print(f"Player {player_index + 1} does not have enough money to create a tower.") 
-            return False  # ไม่สามารถสร้าง Tower ได้เนื่องจากเงินไม่เพียงพอ 
+        # ตรวจสอบว่าผู้เล่นมีเงินเพียงพอหรือไม่
+        if self.player_money[player_index] < 100:
+            print(f"Player {player_index + 1} does not have enough money to create a tower.")
+            return False  # ไม่สามารถสร้าง Tower ได้เนื่องจากเงินไม่เพียงพอ
 
-        # ตรวจสอบว่าตำแหน่งนั้นสามารถสร้าง Tower ได้หรือไม่ 
-        if self.path_finder.is_walkable((x, y)):  # ตรวจสอบว่า Tile เดินได้ 
-            # ตรวจสอบระยะการเคลื่อนที่ของ Unit 
-            distance = self.calculate_distance(self.selected_unit.x, self.selected_unit.y, x, y) 
-            if distance <= self.selected_unit.move_range:  # ตรวจสอบว่าตำแหน่งอยู่ในระยะ 
-                # ตรวจสอบว่ามี Tower อยู่แล้วที่ตำแหน่งนี้หรือไม่ 
+        # ตรวจสอบว่าตำแหน่งนั้นสามารถสร้าง Tower ได้หรือไม่
+        if self.path_finder.is_walkable((x, y)):  # ตรวจสอบว่า Tile เดินได้
+            # ตรวจสอบระยะการเคลื่อนที่ของ Unit
+            distance = self.calculate_distance(self.selected_unit.x, self.selected_unit.y, x, y)
+            if distance <= self.selected_unit.move_range:  # ตรวจสอบว่าตำแหน่งอยู่ในระยะ
                 if not self.is_tower_at_position(x, y): 
-                    player_id = player_index + 1  # กำหนด player_id จาก current_turn (1 หรือ 2) 
-                
+                    player_id = player_index   # กำหนด player_id จาก current_turn (1 หรือ 2)
+
                     # โหลดภาพสำหรับ Tower
-                    if player_id == 1:
+                    if player_id == 0:
                         tower_image = pygame.image.load("assets/sprites/building-blue.png").convert_alpha()
                     else:
                         tower_image = pygame.image.load("assets/sprites/building-red.png").convert_alpha()
-                
+
                     new_tower = Tower(x, y, player_id, tower_image)  # สร้าง Tower ใหม่
-                    self.towers.append(new_tower)  # เพิ่ม Tower ลงในรายการ Tower 
-                    self.tower_created[player_index] = True  # ตั้งค่าสถานะว่าผู้เล่นได้สร้าง Tower แล้ว 
-                    self.player_money[player_index] -= 100  # หักเงิน 100 บาทจากผู้เล่น 
-                    print(f"Tower created at position: ({x}, {y}) for Player {player_id}. Cost: 100.") # แสดงข้อความยืนยันการสร้าง Tower 
-                    return True  # คืนค่า True หากสร้าง Tower สำเร็จ 
-                else: 
-                    print("Cannot create tower: There is already a tower at this position.") # แสดงข้อความหากมี Tower อยู่แล้ว 
-            else: 
-                print("Cannot create tower: Tile is out of unit's range.") # แสดงข้อความหากอยู่นอกระยะ 
-        else: 
-            print("Cannot create tower at this position.") # แสดงข้อความหากไม่สามารถสร้าง Tower ได้ 
-        return False  # คืนค่า False หากไม่สามารถสร้าง Tower ได้  
+                    self.towers.append(new_tower)  # เพิ่ม Tower ลงในรายการ Tower
+                    self.tower_created[player_index] = True  # ตั้งค่าสถานะว่าผู้เล่นได้สร้าง Tower แล้ว
+                    self.player_money[player_index] -= 100  # หักเงิน 100 บาทจากผู้เล่น
+                    print(f"Tower created at position: ({x}, {y}) for Player {player_id}. Cost: 100.")  # แสดงข้อความยืนยันการสร้าง Tower
+                    print(f"Tower owner is Player {player_index + 1}.")  # Debug print
+                    return True  # คืนค่า True หากสร้าง Tower สำเร็จ
+                else:
+                    print("Cannot create tower: There is already a tower at this position.")
+            else:
+                print("Cannot create tower: Tile is out of unit's range.")
+        else:
+            print("Cannot create tower at this position.")
+        return False  # คืนค่า False หากไม่สามารถสร้าง Tower ได้
 
     def draw_create_tower_button(self, attack_button_x, attack_button_y):
         """วาดปุ่ม 'Create Tower' ด้านบนปุ่ม Attack"""
@@ -623,6 +622,10 @@ class Game:
 
         # วาด highlight ช่องที่เดินได้
         self.draw_walkable_tiles()  
+
+        # วาดยูนิตทั้งหมด
+        for unit in self.units:  # ใช้ self.units แทน self.iso_map.objects
+            unit.draw(self.screen, self.iso_map, self.camera, self.config)
 
         for tower in self.towers:
             tower.draw(self.screen, self.camera, self.config)  # วาด Tower
@@ -812,14 +815,22 @@ class Game:
                 print("กรุณาเลือกตำแหน่งเพื่อสร้าง Tower.")
             else:
                 print("กรุณาเลือกยูนิตก่อนที่จะสร้าง Tower.")
-        elif self.selected_tower:  # ตรวจสอบว่ามี Tower ที่เลือกอยู่
-            # ตรวจสอบการคลิกปุ่มสร้าง Archer
-            if self.archer_button.collidepoint(mouse_x, mouse_y):
+        elif self.archer_button.collidepoint(mouse_x, mouse_y):
+            if self.selected_tower:
                 self.create_unit(self.selected_tower, UnitType.ARCHER)
-            # ตรวจสอบการคลิกปุ่มสร้าง Soldier
-            elif self.soldier_button.collidepoint(mouse_x, mouse_y):
+                # รีเซ็ตการเลือกหลังจากสร้างยูนิต
+                self.selected_tower = None
+                self.selected_unit = None
+        elif self.soldier_button.collidepoint(mouse_x, mouse_y):
+            if self.selected_tower:
                 self.create_unit(self.selected_tower, UnitType.SOLDIER)
+                # รีเซ็ตการเลือกหลังจากสร้างยูนิต
+                self.selected_tower = None
+                self.selected_unit = None
         else:
+            # Reset selected tower when clicking elsewhere
+            self.selected_tower = None
+
             found_unit = False
             if self.selected_unit:
                 self.selected_unit.clicked_this_turn = False
@@ -883,6 +894,9 @@ class Game:
         for monster in self.monsters:
             monster.move()  # ให้มอนสเตอร์เคลื่อนที่
             monster.update(delta_time)  # อัปเดตอนิเมชัน
+        
+        for unit in self.units:  # ใช้ self.units แทน self.iso_map.objects
+            unit.update(delta_time)  # อัปเดตยูนิต
 
     def move_monsters(self):
         """เคลื่อนที่มอนสเตอร์"""

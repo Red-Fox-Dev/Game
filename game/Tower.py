@@ -1,17 +1,18 @@
 import pygame
 import math
+
 class Tower:
     def __init__(self, x, y, player_id, image):
-        self.x = x
-        self.y = y
-        self.health = 100
-        self.attack_power = 10
-        self.attack_range = 3
-        self.player_id = player_id
-        self.image = image
-        self.owner = player_id  # เพิ่มแอตทริบิวต์ owner ที่นี่
-        self.width = self.image.get_width()
-        self.height = self.image.get_height()
+        self.x = x  # ตำแหน่ง X ของ Tower
+        self.y = y  # ตำแหน่ง Y ของ Tower
+        self.health = 100  # ค่าเริ่มต้นสุขภาพของ Tower
+        self.attack_power = 10  # พลังโจมตีของ Tower
+        self.attack_range = 3  # ระยะการโจมตีของ Tower
+        self.player_id = player_id  # ระบุผู้เล่นที่เป็นเจ้าของ Tower
+        self.image = image  # ใช้ image ที่ส่งเข้ามาแทนการโหลดใหม่
+        self.width = self.image.get_width()  # กำหนดความกว้างจากภาพ
+        self.height = self.image.get_height()  # กำหนดความสูงจากภาพ
+        self.owner = player_id  # เพิ่มแอตทริบิวต์ owner
 
     def load_image(self):
         """โหลดภาพตามผู้เล่น"""
