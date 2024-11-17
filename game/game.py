@@ -822,7 +822,7 @@ class Game:
         ]
         
         # วาดเส้นรอบไฮไลท์ของกระเบื้อง
-        pygame.draw.lines(self.screen, (255, 255, 0), True, points, 2)
+        pygame.draw.lines(self.screen, (255, 0, 0), True, points, 2)
 
     def update_selected_tile(self):
         """อัปเดตกระเบื้องที่ถูกเลือกตามตำแหน่งเมาส์"""
@@ -1199,7 +1199,7 @@ class Game:
         self.game_over_screen = False  # สถานะการแสดงหน้าจอ Game Over
         self.win_music_played = False  # สถานะการเล่นเพลงชนะ
         pygame.mixer.init()  # เริ่มต้น mixer
-        pygame.mixer.music.load("assets/sound/playing_music.mp3")  # โหลดเพลง
+        pygame.mixer.music.load("sound/playing_music.mp3")  # โหลดเพลง
         pygame.mixer.music.play(-1)  # เล่นเพลงซ้ำตลอดไป
 
         while running:
@@ -1259,7 +1259,7 @@ class Game:
                 
                 # โหลดและเล่นเพลงชนะถ้ายังไม่เคยเล่น
                 if not self.win_music_played:
-                    pygame.mixer.music.load("assets/sound/Victory Final Fantasy VII Music.mp3")  # โหลดเพลงชนะ
+                    pygame.mixer.music.load("sound/Victory Final Fantasy VII Music.mp3")  # โหลดเพลงชนะ
                     pygame.mixer.music.play(-1)  # เล่นเพลงชนะซ้ำตลอดไป
                     self.win_music_played = True 
             pygame.display.flip()
