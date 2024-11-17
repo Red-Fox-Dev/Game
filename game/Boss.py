@@ -1,4 +1,5 @@
 import pygame
+import random
 from .SpriteSheetLoader import SpriteSheetLoader
 
 class Boss:
@@ -16,6 +17,9 @@ class Boss:
         self.last_frame_update_time = pygame.time.get_ticks()
         self.image = self.unit_idle_frames[self.idle_frame_index]  # ใช้เฟรมแรกเป็นภาพเริ่มต้น
         self.font = pygame.font.Font("assets/Fonts/PixgamerRegular-OVD6A.ttf", 20)  # โหลดฟอนต์สำหรับแสดงตัวเลข
+        self.move_timer = 0  # ตัวแปรสำหรับจัดการการเคลื่อนไหว
+        self.move_duration = 2000  # เวลาในการเคลื่อนที่ (มิลลิวินาที)
+        self.direction = random.choice([(0, 1), (1, 0), (0, -1), (-1, 0)])  # ทิศทางเริ่มต้น
 
     def load_idle_animation(self):
         """โหลดแอนิเมชัน idle สำหรับบอส"""
@@ -60,7 +64,6 @@ class Boss:
         current_time = pygame.time.get_ticks()
         if current_time - self.last_frame_update_time > self.idle_frame_duration:
             self.idle_frame_index = (self.idle_frame_index + 1) % len(self.unit_idle_frames)
-            self.image 
             self.image = self.unit_idle_frames[self.idle_frame_index]  # อัปเดตภาพเป็นเฟรมถัดไป
             self.last_frame_update_time = current_time
 
@@ -68,6 +71,30 @@ class Boss:
         iso_x = (x - y) * (32 // 2)  # ปรับตามขนาดของ tile
         iso_y = (x + y) * (16 // 2)  # ปรับตามขนาดของ tile
         return iso_x, iso_y
+
+    def update(self):
+        """อัปเดตสถานะของบอส"""
+        current_time = pygame.time.get_ticks()
+        if current_time - self.move_timer > self.move_duration:
+            self.move_randomly()  # เรียกใช้ฟังก์ชันเพื่อเคลื่อนที่แบบสุ่ม
+            self.move_timer = current_time  # รีเซ็ตตัวจับเวลา
+
+    def move_randomly(self):
+        """เคลื่อนที่บอสในทิศทางสุ่ม"""
+        directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]  # ขึ้น, ขวา, ลง, ซ้าย
+        self.direction = random.choice(directions)  # เลือกทิศทางแบบสุ่ม
+        new_x = self.x + self.direction[0]
+        new_y = self.y + self.direction[1]
+
+        # ตรวจสอบว่าตำแหน่งใหม่อยู่ในขอบเขตของแผนที่
+        if self.is_within_bounds(new_x, new_y):
+            self.x = new_x
+            self.y = new_y
+            print(f"Boss moved to position: ({new_x}, {new_y})")  # แสดงข้อความยืนยันการเคลื่อนที่
+
+    def is_within_bounds(self, x, y):
+        """ตรวจสอบว่าตำแหน่งอยู่ในขอบเขตของแผนที่"""
+        return 0 <= x < self.iso_map.tmx_data.width and 0 <= y < self.iso_map.tmx_data.height
 
     # ฟังก์ชันสำหรับจัดการการโจมตีของบอส
     def counterattack(self, target):

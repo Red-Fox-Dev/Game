@@ -11,14 +11,16 @@ class UnitType(Enum):
     SOLDIER = "soldier"
     ARCHER = "archer"
     MAGE = "mage"  # เพิ่มประเภทยูนิตใหม่
+    CAVALRY = "cavalry"  # เพิ่มประเภทยูนิต Cavalry
 
     @staticmethod
     def get_cost(unit_type):
         """ กำหนดค่าใช้จ่ายสำหรับยูนิตประเภทต่าง ๆ """
         costs = {
-            UnitType.SOLDIER: 50,
+            UnitType.SOLDIER: 70,
             UnitType.ARCHER: 100,
-            UnitType.MAGE: 220  # กำหนดค่าใช้จ่ายสำหรับ Mage
+            UnitType.MAGE: 230,  # กำหนดค่าใช้จ่ายสำหรับ Mage
+            UnitType.CAVALRY: 320  # กำหนดค่าใช้จ่ายสำหรับ Cavalry
         }
         return costs.get(unit_type, 0)
 
@@ -29,7 +31,9 @@ class Unit:
         self.image = self.unit_idle_frames[0]
         self.idle_frame_index = 0
         self.idle_frame_duration = 100
+        self.attack_frame_duration = 250
         self.last_frame_update_time = pygame.time.get_ticks()
+        self.last_attack_frame_update_time = pygame.time.get_ticks()  # ติดตามเวลาสำหรับการอัปเดตเฟรมการโจมตี
         self.x = x
         self.y = y
         self.path = []
@@ -71,7 +75,7 @@ class Unit:
         elif self.unit_type == UnitType.ARCHER:
             return { 
                 "max_hp": 75, 
-                "attack": 30, 
+                "attack": 3000, 
                 "move_range": 2, 
                 "attack_range": 3,
                 "create_tower_range": 3  # เพิ่มคีย์นี้สำหรับ Archer
@@ -83,6 +87,14 @@ class Unit:
                 "move_range": 4,
                 "attack_range": 5,
                 "create_tower_range": 1  # เพิ่มคีย์นี้สำหรับ Mage
+            }
+        elif self.unit_type == UnitType.CAVALRY:  # เพิ่มเงื่อนไขสำหรับ Cavalry
+            return {
+                "max_hp": 150,
+                "attack": 70,
+                "move_range": 6,
+                "attack_range": 2,
+                "create_tower_range": 2  # เพิ่มคีย์นี้สำหรับ Cavalry
             }
         else:
             return {}
@@ -200,10 +212,13 @@ class Unit:
 
         # อัปเดตเฟรมการโจมตี
         if self.is_attacking:
-            self.attack_frame_index += 1
-            if self.attack_frame_index >= len(self.attack_frames):
-                self.attack_frame_index = 0
-                self.is_attacking = False  # รีเซ็ตสถานะการโจ มตี
+            current_time = pygame.time.get_ticks()
+            if current_time - self.last_attack_frame_update_time > self.attack_frame_duration:
+                self.attack_frame_index += 1
+                if self.attack_frame_index >= len(self.attack_frames):
+                    self.attack_frame_index = 0
+                    self.is_attacking = False  # รีเซ็ตสถานะการโจมตี
+                self.last_attack_frame_update_time = current_time  # อัปเดตเวลาสำหรับการอัปเดตเฟรมการโจมตี
 
     def draw(self, screen, iso_map, camera, config):
         if self.current_hp <= 0:
@@ -245,11 +260,27 @@ class Unit:
         self.draw_hp_bar(screen, hp_bar_x, hp_bar_y, self.max_hp, self.current_hp, camera.zoom)  # ส่งค่าซูมไปยังฟังก์ชัน
 
     def load_attack_animation(self):
-        """โหลดแอนิเมชันการโจมตีตามประเภทของยูนิต"""
+        """โหลดแอนิเมชันการโจมตีตามประเภทของยูนิตและเจ้าของ"""
         if self.unit_type == UnitType.SOLDIER:
-            return SpriteSheetLoader.load_sprite_sheet("assets/sprites/unit1_attack_blue.png", frame_width=32, frame_height=32)
+            if self.owner == 0:  # ผู้เล่น 1
+                return SpriteSheetLoader.load_sprite_sheet("assets/sprites/unit1_attack_blue.png", frame_width=32, frame_height=32)
+            else:  # ผู้เล่น 2
+                return SpriteSheetLoader.load_sprite_sheet("assets/sprites/unit1_attack_red.png", frame_width=32, frame_height=32)
         elif self.unit_type == UnitType.ARCHER:
-            return SpriteSheetLoader.load_sprite_sheet("assets/sprites/unit1_attack_red.png", frame_width=32, frame_height=32)
+            if self.owner == 0:  # ผู้เล่น 1
+                return SpriteSheetLoader.load_sprite_sheet("assets/sprites/unit2_attack_blue.png", frame_width=32, frame_height=32)
+            else:  # ผู้เล่น 2
+                return SpriteSheetLoader.load_sprite_sheet("assets/sprites/unit2_attack_red.png", frame_width=32, frame_height=32)
+        elif self.unit_type == UnitType.MAGE:
+            if self.owner == 0:  # ผู้เล่น 1
+                return SpriteSheetLoader.load_sprite_sheet("assets/sprites/Blue-mage-attack.png", frame_width=32, frame_height=32)
+            else:  # ผู้เล่น 2
+                return SpriteSheetLoader.load_sprite_sheet("assets/sprites/red-mage-attack.png", frame_width=32, frame_height=32)
+        elif self.unit_type == UnitType.CAVALRY:
+            if self.owner == 0:  # ผู้เล่น 1
+                return SpriteSheetLoader.load_sprite_sheet("assets/sprites/House-blue-attack.png", frame_width=32, frame_height=32)
+            else:  # ผู้เล่น 2
+                return SpriteSheetLoader.load_sprite_sheet("assets/sprites/House-red-attack.png", frame_width=32, frame_height=32)
         return []
     
     def attack(self, target, game):
@@ -263,6 +294,7 @@ class Unit:
                 target.take_damage(self.attack_value)
                 print(f"{self.name} attacked the Boss! Boss's HP is now {target.health}.")
                 self.attacked_this_turn = True  # ตั้งค่าสถานะว่าได้โจมตีแล้ว
+                self.is_attacking = True  # เริ่มแอนิเมชันการโจมตี
                 if target.is_dead:
                     print(f"Boss has been defeated! Dropped {target.drop_value} coins.")
                     game.player_money[self.owner] += target.drop_value
@@ -272,13 +304,14 @@ class Unit:
                 dropped_money = target.take_damage(self.attack_value)
                 print(f"{self.name} attacked the {target.name}! {target.name}'s HP is now {target.health}.")
                 self.attacked_this_turn = True  # ตั้งค่าสถานะว่าได้โจมตีแล้ว
+                self.is_attacking = True  # เริ่มแอนิเมชันการโจมตี
                 if target.is_dead:
                     print(f"{target.name} has been defeated! Dropped {dropped_money} coins.")
                     game.player_money[self.owner] += dropped_money
                     game.monsters.remove(target)
         else:
             if self.is_in_range(target):
-                self.is_attacking = True
+                self.is_attacking = True  # เริ่มแอนิเมชันการโจมตี
                 target.current_hp -= self.attack_value
                 print(f"{self.name} attacked {target.name}! {target.name}'s HP is now {target.current_hp}.")
                 if target.current_hp <= 0:

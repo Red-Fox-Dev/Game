@@ -77,3 +77,12 @@ class Tower:
         if self.health > 100:  # สมมุติว่าค่าสุขภาพสูงสุดคือ 100
             self.health = 100
         print(f"Tower healed! Current health is {self.health}")
+
+    def update(self):
+        """ฟังก์ชันสำหรับอัปเดตสถานะของ Tower"""
+        # สามารถเพิ่มฟังก์ชันการฟื้นฟูสุขภาพหรือการโจมตีเป้าหมายที่อยู่ในระยะได้ที่นี่
+        pass
+
+    def destroy(self):
+        """ฟังก์ชันสำหรับจัดการการทำลาย Tower"""
+        print("Tower has been destroyed!")
