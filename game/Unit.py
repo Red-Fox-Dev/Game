@@ -3,11 +3,14 @@ import math
 from .game_object import GameObject
 from .SpriteSheetLoader import SpriteSheetLoader
 from enum import Enum
+from .Boss import Boss
+from .monster import Monster
 
 # กำหนดประเภทของยูนิต
 class UnitType(Enum):
     SOLDIER = "soldier"
     ARCHER = "archer"
+    MAGE = "mage"  # เพิ่มประเภทยูนิตใหม่
 
     @staticmethod
     def get_cost(unit_type):
@@ -15,6 +18,7 @@ class UnitType(Enum):
         costs = {
             UnitType.SOLDIER: 50,
             UnitType.ARCHER: 100,
+            UnitType.MAGE: 220  # กำหนดค่าใช้จ่ายสำหรับ Mage
         }
         return costs.get(unit_type, 0)
 
@@ -38,7 +42,8 @@ class Unit:
         self.clicked_this_turn = False
         self.move_range = move_range
         self.moved_this_turn = False  # เพิ่มแอตทริบิวต์นี้เพื่อเก็บสถานะการเคลื่อนที่
-        
+        self.attacked_this_turn = False  # เพิ่มตัวแปรนี้เพื่อเก็บสถานะการโจมตี
+
         # เรียกใช้ get_info เพื่อกำหนดคุณสมบัติของยูนิต
         info = self.get_info()
         self.max_hp = info['max_hp']
@@ -58,7 +63,7 @@ class Unit:
         if self.unit_type == UnitType.SOLDIER:
             return { 
                 "max_hp": 100, 
-                "attack": 50, 
+                "attack": 45, 
                 "move_range": 3, 
                 "attack_range": 1,
                 "create_tower_range": 2  # เพิ่มคีย์นี้สำหรับ Soldier
@@ -66,11 +71,19 @@ class Unit:
         elif self.unit_type == UnitType.ARCHER:
             return { 
                 "max_hp": 75, 
-                "attack": 40, 
+                "attack": 30, 
                 "move_range": 2, 
                 "attack_range": 3,
                 "create_tower_range": 3  # เพิ่มคีย์นี้สำหรับ Archer
             } 
+        elif self.unit_type == UnitType.MAGE:  # เพิ่มเงื่อนไขสำหรับ Mage
+            return {
+                "max_hp": 50,
+                "attack": 70,
+                "move_range": 4,
+                "attack_range": 5,
+                "create_tower_range": 1  # เพิ่มคีย์นี้สำหรับ Mage
+            }
         else:
             return {}
     
@@ -80,8 +93,8 @@ class Unit:
 
     def draw_hp_bar(self, screen, x, y, max_hp, current_hp, zoom):
         """วาด HP Bar สำหรับยูนิต"""
-        bar_width = 50 * zoom  # ปรับความกว้างของ HP Bar ตามซูม
-        bar_height = 5 * zoom   # ปรับความสูงของ HP Bar ตามซูม
+        bar_width = 30 * zoom  # ปรับความกว้างของ HP Bar ให้เล็กลง
+        bar_height = 3 * zoom   # ปรับความสูงของ HP Bar ให้เล็กลง
         hp_percentage = current_hp / max_hp  # คำนวณเปอร์เซ็นต์ของ HP
 
         # วาดกรอบของ HP Bar
@@ -89,30 +102,48 @@ class Unit:
         # วาด HP ที่เหลือ
         pygame.draw.rect(screen, (0, 255, 0), (x, y, bar_width * hp_percentage, bar_height))  # HP สีเขียว
 
-        # วาดตัวเลข HP
-        font = pygame.font.Font("assets/Fonts/PixgamerRegular-OVD6A.ttf", int(12 * zoom))  # ปรับขนาดฟอนต์ตามซูม
-        hp_text = f"{current_hp}/{max_hp}"
-        text_surface = font.render(hp_text, True, (255, 255, 255))  # ข้อความสีขาว
-        text_rect = text_surface.get_rect(center=(x + bar_width / 2, y - 10 * zoom))  # ปรับตำแหน่งให้ตรงกลางเหนือ HP Bar
-        screen.blit(text_surface, text_rect)  # วาดข้อความบนหน้าจอ
-
     def draw_info(self, screen, x, y):
-        """วาดข้อมูลยูนิตบนหน้าจอ""" 
-        font = pygame.font.Font("assets/Fonts/PixgamerRegular-OVD6A.ttf", 20) 
-        info_surface = font.render(f"Name: {self.name}", True, (255, 255, 255)) 
+        """วาดข้อมูลยูนิตบนหน้าจอ"""
+        font = pygame.font.Font("assets/Fonts/PixgamerRegular-OVD6A.ttf", 20)
+
+        # โหลดภาพพื้นหลังสำหรับข้อมูลยูนิต
+        background_image = pygame.image.load("assets/BG/bg_info.png").convert()  # เปลี่ยนเป็น path ของภาพพื้นหลังที่คุณต้องการ
+        background_rect = background_image.get_rect()  # รับขนาดของพื้นหลัง
+        background_rect.topleft = (x - 5, y + 50 - 5)  # ตั้งตำแหน่งของพื้นหลังให้ตรงกับข้อมูลยูนิต
+
+        # วาดพื้นหลัง
+        screen.blit(background_image, background_rect)
+
+        info_surface = font.render(f"Name: {self.name}", True, (255, 255, 255))
         screen.blit(info_surface, (x, y + 50))  # ปรับตำแหน่ง Y ให้ต่ำกว่าข้อความรอบ
 
-        hp_surface = font.render(f"HP: {self.current_hp}/{self.max_hp}", True, (255, 255, 255)) 
-        screen.blit(hp_surface, (x, y + 80 + 50))  # ปรับตำแหน่ง Y
+        # ขยับ HP ลง 1 บรรทัด
+        hp_surface = font.render(f"HP: {self.current_hp}/{self.max_hp}", True, (255, 255, 255))
+        screen.blit(hp_surface, (x, y + 50 + 30))  # ปรับตำแหน่ง Y ลง 1 บรรทัด (30 พิกเซล)
 
-        attack_surface = font.render(f"Attack: {self.attack_value}", True, (255, 255, 255)) 
-        screen.blit(attack_surface, (x, y + 110 + 50))  # ปรับตำแหน่ง Y
+        # วาด HP Bar ข้างๆ ข้อมูล HP
+        bar_width = 100  # ความกว้างของ HP Bar
+        bar_height = 5   # ความสูงของ HP Bar
+        hp_bar_x = x + 100  # ปรับตำแหน่ง X ของ HP Bar
+        hp_bar_y = y + 50 + 30  # ปรับตำแหน่ง Y ของ HP Bar
 
-        move_range_surface = font.render(f"Move Range: {self.move_range}", True, (255, 255, 255)) 
-        screen.blit(move_range_surface, (x, y + 140 + 50))  # ปรับตำแหน่ง Y
+        # วาดกรอบของ HP Bar
+        pygame.draw.rect(screen, (255, 0, 0), (hp_bar_x, hp_bar_y, bar_width, bar_height))  # กรอบสีแดง
+        hp_percentage = self.current_hp / self.max_hp  # คำนวณเปอร์เซ็นต์ของ HP
+        # วาด HP ที่เหลือ
+        pygame.draw.rect(screen, (0, 255, 0), (hp_bar_x, hp_bar_y, bar_width * hp_percentage, bar_height))  # HP สีเขียว
 
-        attack_range_surface = font.render(f"Attack Range: {self.attack_range}", True, (255, 255, 255)) 
-        screen.blit(attack_range_surface, (x, y + 170 + 50))  # ปรับตำแหน่ง Y
+        # ขยับ Attack ลง 1 บรรทัด
+        attack_surface = font.render(f"Attack: {self.attack_value}", True, (255, 255, 255))
+        screen.blit(attack_surface, (x, y + 50 + 60))  # ปรับตำแหน่ง Y ลง 1 บรรทัด (30 พิกเซล)
+
+        # ขยับ Move Range ลง 1 บรรทัด
+        move_range_surface = font.render(f"Move Range: {self.move_range}", True, (255, 255, 255))
+        screen.blit(move_range_surface, (x, y + 50 + 90))  # ปรับตำแหน่ง Y ลง 1 บรรทัด (30 พิกเซล)
+
+        # ขยับ Attack Range ลง 1 บรรทัด
+        attack_range_surface = font.render(f"Attack Range: {self.attack_range}", True, (255, 255, 255))
+        screen.blit(attack_range_surface, (x, y + 50 + 120))  # ปรับตำแหน่ง Y ลง 1 บรรทัด (30 พิกเซล)
     
     def reset_action(self):
         """รีเซ็ตสถานะการทำ action ของยูนิต"""
@@ -219,21 +250,39 @@ class Unit:
             return SpriteSheetLoader.load_sprite_sheet("assets/sprites/unit1_attack_blue.png", frame_width=32, frame_height=32)
         elif self.unit_type == UnitType.ARCHER:
             return SpriteSheetLoader.load_sprite_sheet("assets/sprites/unit1_attack_red.png", frame_width=32, frame_height=32)
-        elif self.unit_type == UnitType.SOLDIER_2:  # สำหรับผู้เล่นที่ 2
-            return SpriteSheetLoader.load_sprite_sheet("assets/sprites/unit2_attack_blue.png", frame_width=32, frame_height=32)
-        elif self.unit_type == UnitType.ARCHER_2:  # สำหรับผู้เล่นที่ 2
-            return SpriteSheetLoader.load_sprite_sheet("assets/sprites/unit2_attack_red.png", frame_width=32, frame_height=32)
         return []
     
-    def attack(self, target):
+    def attack(self, target, game):
         """โจมตีเป้าหมาย"""
-        if self.is_in_range(target):
-            self.is_attacking = True  # ตั้งค่าสถานะการโจมตีเป็น True
-            target.current_hp -= self.attack_value
-            print(f"{self.name} attacked {target.name}! {target.name}'s HP is now {target.current_hp}.")
-            if target.current_hp <= 0:
-                print(f"{target.name} has been destroyed!")
-                # คุณอาจต้องการทำการลบยูนิตนี้จากลิสต์ของยูนิตในเกมที่กำลังทำงานอยู่ที่นี่
+        if self.attacked_this_turn:  # ตรวจสอบว่ามีการโจมตีในเทิร์นนี้หรือไม่
+            print(f"{self.name} has already attacked this turn.")
+            return  # ออกจากฟังก์ชันถ้าโจมตีแล้ว
+
+        if isinstance(target, Boss):
+            if self.is_in_range(target):
+                target.take_damage(self.attack_value)
+                print(f"{self.name} attacked the Boss! Boss's HP is now {target.health}.")
+                self.attacked_this_turn = True  # ตั้งค่าสถานะว่าได้โจมตีแล้ว
+                if target.is_dead:
+                    print(f"Boss has been defeated! Dropped {target.drop_value} coins.")
+                    game.player_money[self.owner] += target.drop_value
+                    game.boss = None
+        elif isinstance(target, Monster):
+            if self.is_in_range(target):
+                dropped_money = target.take_damage(self.attack_value)
+                print(f"{self.name} attacked the {target.name}! {target.name}'s HP is now {target.health}.")
+                self.attacked_this_turn = True  # ตั้งค่าสถานะว่าได้โจมตีแล้ว
+                if target.is_dead:
+                    print(f"{target.name} has been defeated! Dropped {dropped_money} coins.")
+                    game.player_money[self.owner] += dropped_money
+                    game.monsters.remove(target)
+        else:
+            if self.is_in_range(target):
+                self.is_attacking = True
+                target.current_hp -= self.attack_value
+                print(f"{self.name} attacked {target.name}! {target.name}'s HP is now {target.current_hp}.")
+                if target.current_hp <= 0:
+                    print(f"{target.name} has been destroyed!")
     
     def reset_move_status(self):
         """ฟังก์ชันนี้ใช้ในการรีเซ็ตสถานะการเคลื่อนที่เมื่อเริ่มเทิร์นใหม่"""

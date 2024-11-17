@@ -1,4 +1,3 @@
-import pygame
 import pytmx
 from .game_config import GameConfig
 from typing import Tuple

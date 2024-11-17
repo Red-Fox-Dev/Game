@@ -8,10 +8,10 @@ class CapturePoint:
         self.y = y
         self.value = value  # เงินต่อวินาที
         self.owner = None
-        self.value = 50  # ตัวอย่างค่า value ของจุดยึดครอง
+        self.value = 100  # ตัวอย่างค่า value ของจุดยึดครอง
         self.has_received_income = False  # สถานะว่าได้รับเงินในเทิร์นนี้หรือยัง
         self.capture_progress = 0
-        self.capture_speed = 5
+        self.capture_speed = 1
         self.income_interval = 1000  # ทุกๆ 1 วินาที
         self.last_income_time = pygame.time.get_ticks()
         

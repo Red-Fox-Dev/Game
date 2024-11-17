@@ -7,7 +7,7 @@ class GameConfig:
     SCREEN_HEIGHT: int = 720
     TILE_WIDTH: int = 32
     TILE_HEIGHT: int = 16
-    FPS: int = 60
+    FPS: int = 120
     CAMERA_SPEED: int = 5
     MIN_ZOOM: float = 0.5
     MAX_ZOOM: float = 2.0

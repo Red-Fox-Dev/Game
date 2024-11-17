@@ -12,86 +12,87 @@ import math
 from .Unit import Unit,UnitType
 from .Tower import Tower
 from .monster import Monster
+from .Boss import Boss
 
 class Game:
     def __init__(self, config: GameConfig):
-        pygame.init()
+        pygame.init()  # เริ่มต้น Pygame
         self.config = config
-        self.screen = pygame.display.set_mode((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
-        self.clock = pygame.time.Clock()
-        self.iso_map = IsometricMap("assets/Map1.tmx", config)
-        self.camera = Camera(config, self.iso_map.width, self.iso_map.height)
-        self.debug_font = pygame.font.Font("assets/Fonts/PixgamerRegular-OVD6A.ttf", 24)
-        self.path_finder = PathFinder(self.iso_map)
-        self.selected_unit = None
-        self.selected_tower = None
-        self.current_action = None
-        self.last_time = pygame.time.get_ticks()
-        self.walkable_tiles = []
-        self.capture_points = []
-        self.player_money = [250, 250]
-        self.income_next_turn = [0, 0]  # เงินที่ได้จากจุดยึดครองในเทิร์นถัดไป
-        self.generate_capture_points(5)
-        self.current_round = 1
-        self.create_tower_button = None
-        self.towers = []
-        self.tower_created = [False, False]
+        self.screen = pygame.display.set_mode((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))  # กำหนดขนาดของหน้าจอเกม
+        self.clock = pygame.time.Clock()  # ใช้สำหรับการควบคุมอัตราเฟรม
+        self.iso_map = IsometricMap("assets/Map1.tmx", config)  # โหลดแผนที่ในรูปแบบ Isometric จากไฟล์ TMX
+        self.camera = Camera(config, self.iso_map.width, self.iso_map.height)  # สร้างกล้องเพื่อมองแผนที่
+        self.debug_font = pygame.font.Font("assets/Fonts/PixgamerRegular-OVD6A.ttf", 24)  # กำหนดฟอนต์สำหรับการแสดงข้อความ debug
+        self.path_finder = PathFinder(self.iso_map)  # สร้างตัวค้นหาทางเดิน
+        self.selected_unit = None  # หน่วยที่ถูกเลือก
+        self.selected_tower = None  # ป้อมปราการที่ถูกเลือก
+        self.current_action = None  # การกระทำในปัจจุบัน เช่น ย้าย, ยิง ฯลฯ
+        self.last_time = pygame.time.get_ticks()  # เวลาในมิลลิวินาทีที่ผ่านไปตั้งแต่เริ่มเกม
+        self.walkable_tiles = []  # แผนที่ที่สามารถเดินได้
+        self.capture_points = []  # จุดที่สามารถยึดครองได้
+        self.player_money = [250, 250]  # เงินเริ่มต้นของผู้เล่นทั้งสอง
+        self.income_next_turn = [0, 0]  # รายได้จากจุดยึดครองในเทิร์นถัดไป
+        self.current_round = 1  # เลขเทิร์นปัจจุบัน
+        self.create_tower_button = None  # ปุ่มสร้างป้อมปราการ
+        self.towers = []  # รายการของป้อมปราการทั้งหมด
+        self.tower_created = [False, False]  # สถานะการสร้างป้อมปราการของผู้เล่น
         self.unit_creation_button = None  # ปุ่มสำหรับสร้างยูนิต
-        self.unit_type_to_create = None  # ประเภทของยูนิตที่จะสร้าง
-        self.GRID_WIDTH = self.iso_map.tmx_data.width  # จำนวนช่องในแนวนอนจาก TMX
-        self.GRID_HEIGHT = self.iso_map.tmx_data.height  # จำนวนช่องในแนวตั้งจาก TMX
-        self.monsters = []  # กำหนด self.monsters เป็นลิสต์ว่าง
-        self.monsters_created = False  # ตัวแปรเพื่อเก็บสถานะว่ามอนสเตอร์ถูกสร้างขึ้นแล้ว
-        self.create_monsters()  # เรียกใช้ฟังก์ชันสร้างมอนสเตอร์
-        self.last_turn_time = 0  # เวลาของเทิร์นล่าสุด
-        self.turn_interval = 1000  # หรือค่าที่คุณต้องการ
+        self.unit_type_to_create = None  # ประเภทของยูนิตที่ต้องการสร้าง
+        self.GRID_WIDTH = self.iso_map.tmx_data.width  # จำนวนช่องในแนวนอนจากแผนที่ TMX
+        self.GRID_HEIGHT = self.iso_map.tmx_data.height  # จำนวนช่องในแนวตั้งจากแผนที่ TMX
+        self.last_turn_time = 0  # เวลาในเทิร์นล่าสุด
+        self.turn_interval = 1000  # ระยะเวลา (มิลลิวินาที) ระหว่างเทิร์น
+        self.boss = None  # ตัวบอสในเกม (ที่จะต้องมีการสร้าง)
+        self.monsters = []  # รายการของมอนสเตอร์ในเกม
+        self.monster_count = 0  # จำนวนมอนสเตอร์ที่มี
+        self.turns_since_last_spawn = 0  # จำนวนเทิร์นที่ผ่านไปตั้งแต่การเกิดมอนสเตอร์ครั้งล่าสุด
 
+        # การตั้งค่าการแอนิเมชันของปุ่ม Move และ Attack
         self.move_button_animation = {
-        'scale': 1.0,
-        'color': (0, 255, 0),
-        'start_time': 0,
-        'duration': 300,  # ระยะเวลา animation
-        'active': False
+            'scale': 1.0,
+            'color': (0, 255, 0),  # สีเขียวสำหรับปุ่ม Move
+            'start_time': 0,  # เวลาเริ่มต้นการแอนิเมชัน
+            'duration': 300,  # ระยะเวลาของแอนิเมชัน (มิลลิวินาที)
+            'active': False  # ถ้าแอนิเมชันกำลังทำงานอยู่
         }
         self.attack_button_animation = {
             'scale': 1.0,
-            'color': (255, 165, 0),
+            'color': (255, 165, 0),  # สีส้มสำหรับปุ่ม Attack
             'start_time': 0,
             'duration': 300,
             'active': False
         }
 
-        # สร้างเฟรม idle สำหรับยูนิต
-        self.unit_idle_spritesheet = pygame.image.load("assets/sprites/unit2_idle_blue.png").convert_alpha()
-        self.unit_idle_frames = []
-        frame_width = 32
-        frame_height = 32
-        number_of_frames = 4
-        for i in range(number_of_frames):
-            frame = self.unit_idle_spritesheet.subsurface((i * frame_width, 0, frame_width, frame_height))
-            self.unit_idle_frames.append(frame)
-
-        # กำหนดตำแหน่งและขนาดของปุ่ม
+        # การตั้งค่าตำแหน่งและขนาดของปุ่มสำหรับสร้างยูนิต
         button_width = 120
         button_height = 50
-        button_x = 10  # ตำแหน่ง x ของปุ่ม
-        button_y_archer = 10  # ตำแหน่ง y ของปุ่ม Archer
-        button_y_soldier = button_y_archer + button_height + 10  # ตำแหน่ง y ของปุ่ม Soldier
+        button_x = 10  # ตำแหน่ง X ของปุ่ม
+        button_y_archer = 10  # ตำแหน่ง Y ของปุ่ม Archer
+        button_y_soldier = button_y_archer + button_height + 10  # ตำแหน่ง Y ของปุ่ม Soldier
+        button_y_mage = button_y_soldier + button_height + 10  # ตำแหน่ง Y ของปุ่ม Mage
 
-        self.archer_button = pygame.Rect(button_x, button_y_archer, button_width, button_height)  # กำหนดตำแหน่งและขนาดของปุ่ม Archer
-        self.soldier_button = pygame.Rect(button_x, button_y_soldier, button_width, button_height)  # กำหนดตำแหน่งและขนาดของปุ่ม Soldier
-        self.end_turn_button = pygame.Rect(config.SCREEN_WIDTH - button_width - 10, config.SCREEN_HEIGHT - button_height - 10, button_width, button_height)
-        self.move_button = pygame.Rect(self.end_turn_button.x, self.end_turn_button.y - button_height - 10, button_width, button_height)
-        self.attack_button = pygame.Rect(self.move_button.x, self.move_button.y - button_height - 10, button_width, button_height)
-        self.font = pygame.font.Font("./assets/Fonts/PixgamerRegular-OVD6A.ttf", 28)
+        self.archer_button = pygame.Rect(button_x, button_y_archer, button_width, button_height)  # ปุ่ม Archer
+        self.soldier_button = pygame.Rect(button_x, button_y_soldier, button_width, button_height)  # ปุ่ม Soldier
+        self.mage_button = pygame.Rect(button_x, button_y_mage, button_width, button_height)  # ปุ่ม Mage
+        self.end_turn_button = pygame.Rect(config.SCREEN_WIDTH - button_width - 10, config.SCREEN_HEIGHT - button_height - 10, button_width, button_height)  # ปุ่ม End Turn
+        self.move_button = pygame.Rect(self.end_turn_button.x, self.end_turn_button.y - button_height - 10, button_width, button_height)  # ปุ่ม Move
+        self.attack_button = pygame.Rect(self.move_button.x, self.move_button.y - button_height - 10, button_width, button_height)  # ปุ่ม Attack
+        self.game_over_screen = False  # ตัวแปรสำหรับแสดงหน้าจอ Game Over
+        self.game_over_background = pygame.image.load("assets/BG/Backgroud.jpg").convert()  # พื้นหลังหน้าจอ Game Over
+        self.font = pygame.font.Font("./assets/Fonts/PixgamerRegular-OVD6A.ttf", 28)  # ฟอนต์สำหรับแสดงข้อความบนหน้าจอ Game Over
 
         # สร้างยูนิตสำหรับผู้เล่น 1 และ 2
-        self.units = []  # ลิสต์สำหรับเก็บยูนิตทั้งหมด
-        self.player_units = []  # ลิสต์สำหรับเก็บยูนิตของผู้เล่น
-        self.create_player_units()
+        self.units = []  # รายการของยูนิตทั้งหมดในเกม
+        self.player_units = []  # รายการของยูนิตของผู้เล่น
+        self.create_player_units()  # สร้างยูนิตให้กับผู้เล่น
+        self.generate_capture_points(5)  # สร้างจุดยึดครอง (5 จุดในที่นี้)
 
-        self.current_turn = 0
-     
+        self.current_turn = 0  # เทิร์นปัจจุบัน
+        self.spawn_boss()  # สร้างบอส (จะต้องมีการสุ่มหรือกำหนด)
+        self.spawn_monster()  # สร้างมอนสเตอร์ (จะต้องมีการสุ่มหรือกำหนด)
+        
+        self.winner = None  # ตัวแปร winner เพื่อเก็บผลผู้ชนะ
+
     def end_turn(self):
         """จบเทิร์นและรีเซ็ตสถานะ"""
         # เพิ่มเงินให้กับผู้เล่นที่จบเทิร์นจากจุดยึดครอง
@@ -104,33 +105,59 @@ class Game:
 
         # เพิ่มเงินเพิ่ม 100 หน่วยให้กับผู้เล่นเมื่อจบเทิร์น
         self.player_money[self.current_turn] += 100  # เพิ่มเงิน 100 หน่วย
-    
-        # รีเซ็ตสถานะการทำ action ของยูนิตทุกตัวเมื่อเริ่มเทิร์นใหม่ 
-        for unit in self.player_units: 
-            unit.reset_action()  # ฟังก์ชันนี้ต้องถูกสร้างในคลาส Unit 
 
-        # เคลื่อนที่มอนสเตอร์เมื่อจบเทิร์น
-        for monster in self.monsters:
-            monster.move()  # ให้มอนสเตอร์เคลื่อนที่
-            monster.update(0)  # อัปเดตอนิเมชันโดยไม่ใช้ delta_time
+        # รีเซ็ตการเคลื่อนที่และการโจมตีสำหรับยูนิตทั้งหมดของผู้เล่น
+        for unit in self.player_units:
+            unit.moved_this_turn = False
+            unit.attacked_this_turn = False  # รีเซ็ตสถานะการโจมตี
 
-        # เช็คว่าต้องเพิ่มรอบหรือไม่ 
-        if self.current_turn == 1:  # ถ้าผู้เล่น 2 จบเทิร์น 
-            self.current_round += 1  # เพิ่มรอบ 
-            print(f"Round {self.current_round} started.") 
+        # เช็คว่าผู้เล่นมียูนิตเหลืออยู่หรือไม่
+        if not any(unit.current_hp > 0 for unit in self.player_units if unit.owner == self.current_turn):
+            print(f"Player {self.current_turn + 1} has no units left. Game Over!")  # แสดงข้อความเมื่อผู้เล่นไม่มียูนิตเหลือ
+            self.game_over()  # เรียกใช้ฟังก์ชันจบเกม
 
-        # รีเซ็ตสถานะของยูนิตที่เลือก 
-        if self.selected_unit: 
-            self.selected_unit.has_actioned = False  # รีเซ็ตสถานะการทำ action ของยูนิต 
-        self.selected_unit = None  # รีเซ็ตยูนิตที่เลือก 
-        self.current_action = None  # รีเซ็ต action ปัจจุบัน 
+        # เช็คว่าผู้เล่นฝ่ายตรงข้ามมียูนิตเหลืออยู่หรือไม่
+        if not any(unit.current_hp > 0 for unit in self.player_units if unit.owner != self.current_turn):
+            print(f"Player {self.current_turn + 1} has defeated Player {2 if self.current_turn == 1 else 1}. Game Over!")  # แสดงข้อความเมื่อผู้เล่นชนะ
+            self.game_over()  # เรียกใช้ฟังก์ชันจบเกม
+
+        # เช็คว่าต้องเพิ่มรอบหรือไม่
+        if self.current_turn == 1:  # ถ้าผู้เล่น 2 จบเทิร์น
+            self.current_round += 1  # เพิ่มรอบ
+            print(f"Round {self.current_round} started.")  # แสดงข้อความเริ่มรอบใหม่
+
+            # เรียกใช้ฟังก์ชัน spawn_boss ถ้าเป็นรอบที่ 3
+            if self.current_round == 3 and self.boss is None:  # ตรวจสอบว่าบอสยังไม่ถูกสร้าง
+                self.spawn_boss()  # เรียกใช้ฟังก์ชันเพื่อสร้างบอส
+
+        # รีเซ็ตสถานะของยูนิตที่เลือก
+        if self.selected_unit:
+            self.selected_unit.has_actioned = False  # รีเซ็ตสถานะการทำ action ของยูนิต
+        self.selected_unit = None  # รีเซ็ตยูนิตที่เลือก
+        self.current_action = None  # รีเซ็ต action ปัจจุบัน
 
         # รีเซ็ตสถานะการสร้าง Tower สำหรับผู้เล่น
-        self.tower_created = [False, False]  # รีเซ็ตสถานะการสร้าง Tower สำหรับผู้เล่น 1 และ 2 
+        self.tower_created = [False, False]  # รีเซ็ตสถานะการสร้าง Tower สำหรับผู้เล่น 1 และ 2
 
-        # เปลี่ยน turn ระหว่างผู้เล่น 
-        self.current_turn = (self.current_turn + 1) % 2  # เปลี่ยน turn ระหว่างผู้เล่น 0 และ 1 
+        # เรียกใช้ฟังก์ชัน move_monsters
+        self.move_monsters()  # เคลื่อนที่มอนสเตอร์
+
+        # เพิ่มจำนวนเทิร์นที่ผ่านไป
+        self.turns_since_last_spawn += 1  # เพิ่มจำนวนเทิร์นที่ผ่านไป
+
+        # ตรวจสอบว่าเป็นเทิร์นที่ 2 หรือไม่
+        if self.turns_since_last_spawn >= 2:
+            self.spawn_monster()  # เรียกฟังก์ชันเพื่อสร้างมอนสเตอร์ใหม่
+            self.turns_since_last_spawn = 0  # รีเซ็ตจำนวนเทิร์นที่ผ่านไป
+
+        # เปลี่ยน turn ระหว่างผู้เล่น
+        self.current_turn = (self.current_turn + 1) % 2  # เปลี่ยน turn ระหว่างผู้เล่น 0 และ 1
         print(f"Turn changed to player {self.current_turn + 1}.")  # แสดงข้อความเปลี่ยนเทิร์น
+
+        # เช็คว่าผู้เล่นฝ่ายตรงข้ามมียูนิตเหลืออยู่หรือไม่
+        if not any(unit.current_hp > 0 for unit in self.player_units if unit.owner != self.current_turn):
+            print(f"Player {self.current_turn + 1} has defeated Player {2 if self.current_turn == 1 else 1}. Game Over!")
+            self.game_over(self.current_turn)  # ส่ง current_turn ไปยังฟังก์ชัน game_over
 
     def create_player_units(self):
         """สร้างยูนิตสำหรับผู้เล่น 1 และ 2"""
@@ -178,10 +205,19 @@ class Game:
     def generate_capture_points(self, count):
         """สร้างจุดยึดครองเริ่มต้น"""
         valid_positions = []
+        min_distance = 4  # กำหนดระยะห่างขั้นต่ำระหว่างจุดยึดครอง
+        unit_min_distance = 5  # กำหนดระยะห่างขั้นต่ำระหว่างจุดยึดครองกับยูนิต
+
         for x in range(self.iso_map.tmx_data.width):
             for y in range(self.iso_map.tmx_data.height):
                 if self.path_finder.is_walkable((x, y)):
-                    valid_positions.append((x, y))
+                    # ตรวจสอบว่าตำแหน่งนี้ห่างจากจุดยึดครองอื่น ๆ
+                    if all(self.calculate_distance(x, y, cp.x, cp.y) >= min_distance for cp in self.capture_points):
+                        # ตรวจสอบว่าตำแหน่งนี้ห่างจากยูนิตของผู้เล่น 1
+                        if all(self.calculate_distance(x, y, unit.x, unit.y) >= unit_min_distance for unit in self.player_units if unit.owner == 0):
+                            # ตรวจสอบว่าตำแหน่งนี้ห่างจากยูนิตของผู้เล่น 2
+                            if all(self.calculate_distance(x, y, unit.x, unit.y) >= unit_min_distance for unit in self.player_units if unit.owner == 1):
+                                valid_positions.append((x, y))
 
         if valid_positions:
             positions = random.sample(valid_positions, min(count, len(valid_positions)))
@@ -245,7 +281,7 @@ class Game:
         self.screen.blit(text_surface, text_rect)
 
     def draw_create_unit_buttons(self, tower):
-        """วาดปุ่ม 'Create Archer' และ 'Create Soldier' ข้างๆ Tower ที่ถูกคลิก""" 
+        """วาดปุ่ม 'Create Archer', 'Create Soldier' และ 'Create Mage' ข้างๆ Tower ที่ถูกคลิก""" 
         iso_x, iso_y = self.iso_map.cart_to_iso(tower.x, tower.y)
         screen_x = iso_x * self.camera.zoom + self.config.OFFSET_X + self.camera.position.x
         screen_y = iso_y * self.camera.zoom + self.config.OFFSET_Y + self.camera.position.y - (self.config.TILE_HEIGHT * self.camera.zoom)
@@ -260,7 +296,7 @@ class Game:
         self.archer_button = pygame.Rect(archer_button_x, archer_button_y, button_width, button_height) 
         pygame.draw.rect(self.screen, (0, 255, 0), self.archer_button)  # วาดปุ่มสีเขียว 
         font = pygame.font.Font("assets/Fonts/PixgamerRegular-OVD6A.ttf", 20) 
-        text_surface = font.render("Create Archer", True, (255, 255, 255)) 
+        text_surface = font.render("Create Archer", True, (0, 0, 0)) 
         text_rect = text_surface.get_rect(center=self.archer_button.center) 
         self.screen.blit(text_surface, text_rect) 
 
@@ -270,33 +306,27 @@ class Game:
 
         self.soldier_button = pygame.Rect(soldier_button_x, soldier_button_y, button_width, button_height) 
         pygame.draw.rect(self.screen, (0, 0, 255), self.soldier_button)  # วาดปุ่มสีน้ำเงิน 
-        text_surface = font.render("Create Soldier", True, (255, 255, 255)) 
+        text_surface = font.render("Create Soldier", True, (0, 0, 0)) 
         text_rect = text_surface.get_rect(center=self.soldier_button.center) 
+        self.screen.blit(text_surface, text_rect) 
+
+        # ปุ่มสร้าง Mage
+        mage_button_x = screen_x + 10  # ปรับตำแหน่ง X ให้อยู่ข้าง Tower 
+        mage_button_y = soldier_button_y - button_height - 10  # ปรับตำแหน่ง Y ให้อยู่เหนือ Soldier button 
+
+        self.mage_button = pygame.Rect(mage_button_x, mage_button_y, button_width, button_height) 
+        pygame.draw.rect(self.screen, (255, 0, 255), self.mage_button)  # วาดปุ่มสีม่วง 
+        text_surface = font.render("Create Mage", True, (0, 0, 0)) 
+        text_rect = text_surface.get_rect(center=self.mage_button.center) 
         self.screen.blit(text_surface, text_rect)
 
-
-    def draw_capture_point_info(self):
-        """วาดข้อมูลเกี่ยวกับจุดยึดครอง"""
-        for point in self.capture_points:
-            if point.owner is None:
-                status_text = "Not Captured"
-            else:
-             status_text = "Captured by Player"  # หรือชื่อผู้เล่นถ้ามีการจัดการหลายผู้เล่น
-
-            # คำนวณตำแหน่งการวาดข้อความ
-            iso_x, iso_y = self.iso_map.cart_to_iso(point.x, point.y)
-            screen_x = iso_x * self.camera.zoom + self.config.OFFSET_X + self.camera.position.x
-            screen_y = iso_y * self.camera.zoom + self.config.OFFSET_Y + self.camera.position.y
-
-            # วาดข้อความ
-            status_surface = self.debug_font.render(status_text, True, (255, 255, 255))
-            self.screen.blit(status_surface, (screen_x, screen_y - 45))  # ปรับตำแหน่งตามต้องการ
-    
     def draw_money_display(self):
         """แสดงจำนวนเงินของผู้เล่นที่มีเทิร์นบนหน้าจอ"""
         current_player_index = self.current_turn  # ดึงหมายเลขผู้เล่นที่มีเทิร์น
-        money_text = self.debug_font.render(f"Player {current_player_index + 1} Money: ${self.player_money[current_player_index]}", 
-                                         True, (255, 215, 0))
+        # เปลี่ยนขนาดฟอนต์ให้ใหญ่ขึ้น
+        large_font = pygame.font.Font("assets/Fonts/PixgamerRegular-OVD6A.ttf", 32)  # เปลี่ยนขนาดฟอนต์เป็น 36
+        money_text = large_font.render(f"Player {current_player_index + 1} Money: ${self.player_money[current_player_index]}", 
+                                   True, (205, 28, 24))  # เปลี่ยนสีตัวอักษรเป็นสีดำ
     
         # ปรับตำแหน่ง Y ของข้อความให้สูงขึ้นจากตำแหน่งปุ่ม "End Turn"
         money_text_y = self.end_turn_button.top - 10  # 10 พิกเซลด้านบนของปุ่ม
@@ -304,8 +334,8 @@ class Game:
 
         # แสดงจำนวนจุดที่ยึดได้
         captured_points = sum(1 for point in self.capture_points if point.owner is not None)
-        points_text = self.debug_font.render(f"Captured Points: {captured_points}/{len(self.capture_points)}", 
-                                          True, (255, 215, 0))
+        points_text = large_font.render(f"Captured Points: {captured_points}/{len(self.capture_points)}", 
+                                    True, (205, 28, 24))  # เปลี่ยนสีตัวอักษรเป็นสีดำ
     
         # ปรับตำแหน่ง Y ของข้อความจำนวนจุดที่ยึดได้ให้สูงขึ้นจากปุ่ม "End Turn"
         points_text_y = money_text_y - 30  # 30 พิกเซลด้านบนของข้อความเงิน
@@ -316,11 +346,6 @@ class Game:
         current_time = pygame.time.get_ticks()
         for point in self.capture_points:
             point.update(self.iso_map.objects, current_time)
-
-            # เช็คว่ามีเจ้าของ
-            if point.owner is not None:
-                # อาจจะมีการจัดการอื่น ๆ ที่เกี่ยวข้องกับเจ้าของจุดยึดครอง
-                pass  # คุณสามารถเพิ่มโค้ดเพิ่มเติมได้ที่นี่ถ้าต้องการ
 
     def get_walkable_tiles(self, unit, max_distance=5):
         """หาช่องที่สามารถเดินไปได้ในระยะที่กำหนด"""
@@ -445,6 +470,88 @@ class Game:
         text_rect = text_surface.get_rect(center=scaled_button.center)
         self.screen.blit(text_surface, text_rect)
 
+    def move_monsters(self):
+        for monster in self.monsters:
+            if not monster.is_dead:  # ตรวจสอบว่ามอนสเตอร์ยังมีชีวิตอยู่
+                # สุ่มเลือกทิศทางการเคลื่อนที่
+                direction = random.choice(self.path_finder.directions)  # เลือกทิศทางแบบสุ่ม
+
+                new_x = monster.x + direction[0]  # อัปเดตตำแหน่ง X
+                new_y = monster.y + direction[1]  # อัปเดตตำแหน่ง Y
+
+                # ตรวจสอบว่าตำแหน่งใหม่อยู่ในขอบเขตของแผนที่
+                if (0 <= new_x < self.iso_map.tmx_data.width) and (0 <= new_y < self.iso_map.tmx_data.height):
+                    # ตรวจสอบว่าตำแหน่งใหม่เดินได้หรือไม่
+                    if self.path_finder.is_walkable((new_x, new_y)):
+                        # อัปเดตตำแหน่งมอนสเตอร์
+                        monster.x = new_x
+                        monster.y = new_y
+                        print(f"{monster.name} moved to position: ({new_x}, {new_y})")  # แสดงข้อความยืนยันการเคลื่อนที่
+                else:
+                    print(f"{monster.name} cannot move to position: ({new_x}, {new_y}) - out of bounds")  # แสดงข้อความเมื่อมอนสเตอร์ไม่สามารถเคลื่อนที่
+
+    def spawn_monster(self):
+        if self.monster_count < 5:  # ตรวจสอบว่าจำนวนมอนสเตอร์น้อยกว่า 5 หรือไม่
+            valid_positions = []
+
+            # สุ่มตำแหน่งที่อยู่ภายในขอบของแผนที่
+            for x in range(1, self.iso_map.tmx_data.width - 1):  # เริ่มจาก 1 ถึง width - 1
+                for y in range(1, self.iso_map.tmx_data.height - 1):  # เริ่มจาก 1 ถึง height - 1
+                    if self.path_finder.is_walkable((x, y)) and not self.is_near_units(x, y):
+                        # ตรวจสอบระยะห่างจากมอนสเตอร์ที่มีอยู่แล้ว
+                        if all(self.calculate_distance(x, y, monster.x, monster.y) >= 3 for monster in self.monsters):
+                            # ตรวจสอบระยะห่างจากยูนิตของผู้เล่น
+                            if all(self.calculate_distance(x, y, unit.x, unit.y) >= 5 for unit in self.player_units):
+                                valid_positions.append((x, y))
+
+            if valid_positions:
+                x, y = random.choice(valid_positions)  # สุ่มตำแหน่งจาก valid_positions
+                monster = Monster(x, y, name="Monster")  # สร้างมอนสเตอร์ที่ตำแหน่งที่สุ่มได้
+                self.monsters.append(monster)  # เพิ่มมอนสเตอร์ลงในรายการ
+                self.monster_count += 1  # เพิ่มจำนวนมอนสเตอร์
+                print(f"Monster spawned at position: ({x}, {y})")  # แสดงพิกัดที่มอนสเตอร์เกิด
+
+    def remove_monster(self, monster):
+        if monster in self.monsters:
+            self.monsters.remove(monster)  # ลบมอนสเตอร์จากรายการ
+            self.monster_count -= 1  # ลดจำนวนมอนสเตอร์
+            print(f"{monster.name} has been removed.")
+    
+    def draw_message(self, message, duration=500):
+        """วาดข้อความลงบนหน้าจอ"""
+        font = pygame.font.Font("assets/Fonts/PixgamerRegular-OVD6A.ttf", 48)  # ใช้ฟอนต์ที่ต้องการ
+        text_surface = font.render(message, True, (255, 0, 0))  # สีแดง
+        text_rect = text_surface.get_rect(center=(self.config.SCREEN_WIDTH // 2, 30))  # จัดตำแหน่งกลาง
+        self.screen.blit(text_surface, text_rect)  # วาดข้อความลงบนหน้าจอ
+        pygame.display.flip()  # อัปเดตหน้าจอ
+        pygame.time.delay(duration)  # รอเป็นระยะเวลาที่กำหนด
+
+    def spawn_boss(self):
+        # ตรวจสอบว่าปัจจุบันเป็นรอบที่ 3 หรือไม่
+        if self.current_round == 3 and self.boss is None:  # ตรวจสอบว่าบอสยังไม่ถูกสร้าง
+            valid_positions = []
+
+            # สุ่มตำแหน่งที่อยู่ภายในขอบของแผนที่
+            for x in range(1, self.iso_map.tmx_data.width - 1):  # เริ่มจาก 1 ถึง width - 1
+                for y in range(1, self.iso_map.tmx_data.height - 1):  # เริ่มจาก 1 ถึง height - 1
+                    if self.path_finder.is_walkable((x, y)) and not self.is_near_units(x, y):
+                        # ตรวจสอบระยะห่างจากยูนิตของผู้เล่น
+                        if all(self.calculate_distance(x, y, unit.x, unit.y) >= 5 for unit in self.player_units):
+                            valid_positions.append((x, y))
+
+            if valid_positions:
+                x, y = random.choice(valid_positions)  # สุ่มตำแหน่งจาก valid_positions
+                self.boss = Boss(x, y)  # สร้างบอสที่ตำแหน่งที่สุ่มได้
+                print(f"Boss spawned at position: ({x}, {y})")  # แสดงพิกัดที่บอสเกิด
+                self.draw_message("Boss has spawned!", duration=500)  # แสดงข้อความเมื่อบอสเกิด
+
+    def is_near_units(self, x, y, distance=2):
+        """ตรวจสอบว่ามียูนิตใกล้ตำแหน่งที่กำหนดหรือไม่"""
+        for unit in self.player_units:
+            if self.calculate_distance(unit.x, unit.y, x, y) < distance:
+                return True
+        return False
+    
     def calculate_distance(self, x1, y1, x2, y2):
         """คำนวณระยะห่างระหว่างสองจุดในพิกัด 2D"""
         return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
@@ -512,6 +619,8 @@ class Game:
             sprite_path = "assets/sprites/unit1_idle_blue.png" if player_index == 0 else "assets/sprites/unit1_idle_red.png"
         elif unit_type == UnitType.ARCHER:
             sprite_path = "assets/sprites/unit2_idle_blue.png" if player_index == 0 else "assets/sprites/unit2_idle_red.png"
+        elif unit_type == UnitType.MAGE:  # เพิ่มเงื่อนไขสำหรับ Mage
+            sprite_path = "assets/sprites/mage_blue.png" if player_index == 0 else "assets/sprites/mage_red.png"
 
         # โหลดเฟรม idle สำหรับยูนิตที่ถูกสร้าง
         unit_idle_spritesheet = pygame.image.load(sprite_path).convert_alpha()
@@ -616,10 +725,6 @@ class Game:
                         if (x, y) == self.iso_map.selected_tile:
                             self.draw_tile_highlight(x, y)
         
-         # วาดมอนสเตอร์ในแผนที่
-        for monster in self.monsters:
-            monster.draw(self.screen, self.iso_map, self.camera, self.config)  # เรียกใช้ฟังก์ชัน draw ของมอนสเตอร์
-
         # วาด highlight ช่องที่เดินได้
         self.draw_walkable_tiles()  
 
@@ -640,13 +745,19 @@ class Game:
         for obj in self.iso_map.objects:
             if isinstance(obj, Unit):  # ตรวจสอบว่า obj เป็น Unit หรือไม่
                 obj.draw(self.screen, self.iso_map, self.camera, self.config)
-        # วาดข้อมูลเกี่ยวกับจุดยึดครอง
-        self.draw_capture_point_info()
 
         # วาด highlight unit ที่เลือก
         if self.selected_unit:
             self.draw_unit_highlight(self.selected_unit)
-           
+
+        # วาดบอสถ้ามี
+        if self.boss:
+            self.boss.draw(self.screen, self.camera, self.config)
+        
+        # วาดมอนสเตอร์ทั้งหมด
+        for monster in self.monsters:
+            monster.draw(self.screen, self.camera, self.config)  # วาดมอนสเตอร์
+
     def draw_unit_highlight(self, unit):
         """วาดเส้นไฮไลท์รอบ unit ที่ถูกเลือก"""
         
@@ -665,25 +776,25 @@ class Game:
         text_rect = text_surface.get_rect(topright=(self.config.SCREEN_WIDTH - 10, 10))  # จัดตำแหน่งที่มุมขวาบน
         self.screen.blit(text_surface, text_rect)  # วาดข้อความลงบนหน้าจอ
 
-    def draw_tile_highlight(self, tile_x: int, tile_y: int):
-        """วาดเส้นไฮไลท์สีเหลืองรอบกระเบื้องที่ถูกเลือก"""
+    def draw_tile_highlight(self, tile_x: int, tile_y: int, color=(255, 0, 0)):
+        """วาดเส้นไฮไลท์รอบกระเบื้องที่ถูกเลือก"""
         iso_x, iso_y = self.iso_map.cart_to_iso(tile_x, tile_y)
         screen_x = iso_x * self.camera.zoom + self.config.OFFSET_X + self.camera.position.x
         screen_y = iso_y * self.camera.zoom + self.config.OFFSET_Y + self.camera.position.y
-        
+    
         # กำหนดมุมของกระเบื้องให้เป็นรูปทรงเพชร
         tile_width = self.config.TILE_WIDTH * self.camera.zoom
         tile_height = self.config.TILE_HEIGHT * self.camera.zoom
-        
+    
         points = [
-            (screen_x, screen_y + tile_height//2),  # ด้านบน
-            (screen_x + tile_width//2, screen_y),   # ด้านขวา
-            (screen_x + tile_width, screen_y + tile_height//2),  # ด้านล่าง
-            (screen_x + tile_width//2, screen_y + tile_height)   # ด้านซ้าย
+            (screen_x, screen_y + tile_height // 2),  # ด้านบน
+            (screen_x + tile_width // 2, screen_y),   # ด้านขวา
+            (screen_x + tile_width, screen_y + tile_height // 2),  # ด้านล่าง
+            (screen_x + tile_width // 2, screen_y + tile_height)   # ด้านซ้าย
         ]
-        
+    
         # วาดเส้นรอบไฮไลท์ของกระเบื้อง
-        pygame.draw.lines(self.screen, (255, 255, 0), True, points, 2)
+        pygame.draw.lines(self.screen, color, True, points, 2)
 
     def update_selected_tile(self):
         """อัปเดตกระเบื้องที่ถูกเลือกตามตำแหน่งเมาส์"""
@@ -721,19 +832,27 @@ class Game:
 
     def draw_tower_highlight(self, tower):
         """วาดเส้นไฮไลท์รอบ Tower ที่ถูกเลือก""" 
-        print("Drawing tower highlight...")  # Debug print 
-        iso_x, iso_y = self.iso_map.cart_to_iso(tower.x, tower.y) 
-        screen_x = iso_x * self.camera.zoom + self.config.OFFSET_X + self.camera.position.x 
-        screen_y = iso_y * self.camera.zoom + self.config.OFFSET_Y + self.camera.position.y - (self.config.TILE_HEIGHT * self.camera.zoom) 
+        print("Drawing tower highlight...")  # Debug print - แสดงข้อความเมื่อฟังก์ชันถูกเรียกใช้งาน
 
-        highlight_width = int(32 * self.camera.zoom) 
-        highlight_height = int(32 * self.camera.zoom) 
+        # แปลงพิกัดของป้อมปราการจากพิกัดคาร์โทเซลส์ (cartesian) เป็นพิกัดไอโซเมตริก (isometric)
+        iso_x, iso_y = self.iso_map.cart_to_iso(tower.x, tower.y)
 
+        # คำนวณตำแหน่งบนหน้าจอในมุมมอง 2D โดยใช้การซูมและตำแหน่งของกล้อง
+        screen_x = iso_x * self.camera.zoom + self.config.OFFSET_X + self.camera.position.x
+        screen_y = iso_y * self.camera.zoom + self.config.OFFSET_Y + self.camera.position.y - (self.config.TILE_HEIGHT * self.camera.zoom)
+
+        # กำหนดขนาดของกรอบไฮไลท์ (highlight) โดยปรับตามการซูม
+        highlight_width = int(32 * self.camera.zoom)  # กำหนดความกว้าง
+        highlight_height = int(32 * self.camera.zoom)  # กำหนดความสูง
+
+        # วาดกรอบไฮไลท์ (highlight) รอบๆ ป้อมปราการที่ถูกเลือก โดยใช้สีเหลือง (255, 255, 0)
         pygame.draw.rect(self.screen, (255, 255, 0), 
-                     (screen_x, screen_y, highlight_width, highlight_height), 2) 
+                     (screen_x, screen_y, highlight_width, highlight_height), 2)  # วาดกรอบด้วยเส้นขอบหนา 2 พิกเซล
 
-        print("Highlight drawn.")  # Debug print 
-        self.draw_create_unit_buttons(tower)  # Call the updated function to draw unit buttons
+        print("Highlight drawn.")  # Debug print - แสดงข้อความเมื่อการวาดเสร็จสิ้น
+
+        # เรียกฟังก์ชันเพื่อวาดปุ่มสำหรับสร้างยูนิต (เช่น Archer, Soldier, Mage) รอบๆ ป้อมปราการ
+        self.draw_create_unit_buttons(tower)  # ฟังก์ชันนี้จะวาดปุ่มสำหรับสร้างยูนิตต่างๆ
 
     def attack_enemy(self, target):
         """โจมตีเป้าหมาย"""
@@ -789,26 +908,30 @@ class Game:
                 self.select_action('move')
             else:
                 print("กรุณาเลือกยูนิตก่อนที่จะเคลื่อนที่.")
+
         elif self.attack_button.collidepoint(mouse_x, mouse_y):
             if self.selected_unit:
-                self.current_action = 'attack'
-                print("กรุณาเลือกเป้าหมายเพื่อโจมตี.")
+                if not self.selected_unit.attacked_this_turn:  # ตรวจสอบว่ามีการโจมตีในเทิร์นนี้หรือไม่
+                    self.current_action = 'attack'
+                    print("กรุณาเลือกเป้าหมายเพื่อโจมตี.")
 
-                # เรียกฟังก์ชันเพื่อหามอนสเตอร์ที่ผู้เล่นคลิก
-                target = self.get_target_monster(mouse_x, mouse_y)
+                    # เรียกฟังก์ชันเพื่อหาวัตถุเป้าหมายที่ผู้เล่นคลิก
+                    target = self.get_target_object(mouse_x, mouse_y)
 
-                if target is not None:
-                    # ถ้ามีเป้าหมายที่เลือก
-                    self.selected_unit.attack(target)
-                    print(f"{self.selected_unit.name} is attacking {target.monster_type if hasattr(target, 'monster_type') else 'target'}.")
+                    if target is not None:
+                        # ถ้ามีเป้าหมายที่เลือก
+                        self.selected_unit.attack(target, self)  # ส่ง self เป็นอาร์กิวเมนต์ game
+                        self.selected_unit.attacked_this_turn = True  # ตั้งค่าสถานะว่ามีการโจมตีแล้ว
+                        print(f"{self.selected_unit.name} is attacking {target.object_type}.")
+                    else:
+                        print("ไม่มีเป้าหมายในระยะโจมตี.")
                 else:
-                    print("ไม่มีเป้าหมายในระยะโจมตี.")
+                    print("ยูนิตนี้ได้โจมตีในเทิร์นนี้แล้ว.")
             else:
                 print("กรุณาเลือกยูนิตก่อนที่จะโจมตี.")
 
         elif self.end_turn_button.collidepoint(mouse_x, mouse_y):
             self.end_turn()  # เรียกใช้ฟังก์ชัน end_turn ที่จะจัดการกับการเดินของมอนสเตอร์
-            self.move_monsters()  # เพิ่มการเดินของมอนสเตอร์เมื่อกด End Turn
         elif self.create_tower_button and self.create_tower_button.collidepoint(mouse_x, mouse_y):
             if self.selected_unit:
                 self.current_action = 'create_tower'
@@ -827,47 +950,73 @@ class Game:
                 # รีเซ็ตการเลือกหลังจากสร้างยูนิต
                 self.selected_tower = None
                 self.selected_unit = None
+        elif self.mage_button.collidepoint(mouse_x, mouse_y):  # เพิ่มเงื่อนไขสำหรับ Mage
+            if self.selected_tower:
+                self.create_unit(self.selected_tower, UnitType.MAGE)  # สร้างยูนิต Mage
+                self.selected_tower = None
+                self.selected_unit = None
         else:
             # Reset selected tower when clicking elsewhere
-            self.selected_tower = None
+            self.selected_tower = None  # รีเซ็ตป้อมปราการที่ถูกเลือกเมื่อคลิกที่ตำแหน่งอื่น
 
-            found_unit = False
+            found_unit = False  # ตัวแปรใช้ตรวจสอบว่าเจอยูนิตหรือไม่
             if self.selected_unit:
-                self.selected_unit.clicked_this_turn = False
+                self.selected_unit.clicked_this_turn = False  # รีเซ็ตสถานะว่าไม่ได้คลิกยูนิตในเทิร์นนี้
 
-            # Check if clicked on a player's unit
+            # ตรวจสอบว่าคลิกบนยูนิตของผู้เล่นหรือไม่
             for unit in self.player_units:
-                if int(unit.x) == tile_x and int(unit.y) == tile_y:
-                    if unit.owner == self.current_turn and unit.current_hp > 0:  # ตรวจสอบ HP
-                        self.selected_unit = unit
-                        self.walkable_tiles = self.get_walkable_tiles(unit)
-                        self.selected_unit.clicked_this_turn = True
-                        found_unit = True
-                        self.current_action = None
+                if int(unit.x) == tile_x and int(unit.y) == tile_y:  # ตรวจสอบว่าเป็นตำแหน่งเดียวกันกับยูนิตที่ถูกคลิกหรือไม่
+                    if unit.owner == self.current_turn and unit.current_hp > 0:  # ตรวจสอบว่าเป็นยูนิตของผู้เล่นที่มีชีวิตอยู่
+                        self.selected_unit = unit  # เลือกยูนิต
+                        self.walkable_tiles = self.get_walkable_tiles(unit)  # คำนวณแผนที่ที่ยูนิตสามารถเดินได้
+                        self.selected_unit.clicked_this_turn = True  # ตั้งค่าสถานะว่าได้คลิกยูนิตนี้แล้ว
+                        found_unit = True  # เจอยูนิตแล้ว
+                        self.current_action = None  # รีเซ็ตการกระทำปัจจุบัน
                         break
 
-            # Check if clicked on a tower
-            tower_clicked = False
+            # ตรวจสอบว่าคลิกบนป้อมปราการหรือไม่
+            tower_clicked = False  # ตัวแปรใช้ตรวจสอบว่าคลิกบนป้อมปราการ
             for tower in self.towers: 
-                if int(tower.x) == tile_x and int(tower.y) == tile_y: 
-                    self.selected_tower = tower 
-                    tower_clicked = True
+                if int(tower.x) == tile_x and int(tower.y) == tile_y:  # ตรวจสอบว่าเป็นตำแหน่งเดียวกับป้อมปราการ
+                    self.selected_tower = tower  # เลือกป้อมปราการ
+                    tower_clicked = True  # ป้อมปราการถูกคลิกแล้ว
                     print(f"Selected tower at position: ({tower.x}, {tower.y})")  # Debug print
                     break 
 
-            # If no tower was clicked, clear the selected tower
+            # หากไม่พบป้อมปราการที่ถูกคลิกให้รีเซ็ต selected_tower
             if not tower_clicked:
                 self.selected_tower = None
 
-            # Check if clicked on an opponent's unit
+            # ตรวจสอบการโจมตี
             for opponent_unit in self.player_units:
                 if int(opponent_unit.x) == tile_x and int(opponent_unit.y) == tile_y:
-                    if opponent_unit.owner != self.current_turn:
-                        if self.current_action == 'attack':
-                            self.selected_unit.attack(opponent_unit)
-                            self.current_action = None
+                    if opponent_unit.owner != self.current_turn:  # ตรวจสอบว่าคลิกบนยูนิตของศัตรู
+                        if self.current_action == 'attack' and self.selected_unit and not self.selected_unit.attacked_this_turn:
+                            self.selected_unit.attack(opponent_unit, self)  # ยูนิตของผู้เล่นโจมตี
+                            self.selected_unit.attacked_this_turn = True  # ตั้งค่าสถานะว่าได้โจมตีแล้ว
+                            self.current_action = None  # รีเซ็ตการกระทำ
                         break
 
+            # ตรวจสอบการโจมตีบอส
+            if self.boss and int(self.boss.x) == tile_x and int(self.boss.y) == tile_y:
+                if self.current_action == 'attack' and self.selected_unit and not self.selected_unit.attacked_this_turn:
+                    self.selected_unit.attack(self.boss, self)  # ยูนิตของผู้เล่นโจมตีบอส
+                    self.selected_unit.attacked_this_turn = True  # ตั้งค่าสถานะว่าได้โจมตีบอสแล้ว
+                    self.current_action = None  # รีเซ็ตการกระทำ
+                    print(f"{self.selected_unit.name} is attacking the Boss!")
+
+            # ตรวจสอบการโจมตีมอนสเตอร์
+            for monster in self.monsters:  # สมมุติว่ามีลิสต์ monsters เก็บมอนสเตอร์
+                if int(monster.x) == tile_x and int(monster.y) == tile_y:  # ตรวจสอบว่าคลิกมอนสเตอร์
+                    if self.current_action == 'attack' and self.selected_unit and not self.selected_unit.attacked_this_turn:
+                        self.selected_unit.attack(monster, self)  # ยูนิตโจมตีมอนสเตอร์
+                        self.selected_unit.attacked_this_turn = True  # ตั้งค่าสถานะว่าได้โจมตีแล้ว
+                        self.current_action = None  # รีเซ็ตการกระทำ
+                        print(f"{self.selected_unit.name} is attacking {monster.name}!")  # แสดงข้อความว่าโจมตีมอนสเตอร์
+
+                    break  # ออกจากลูปหลังจากตรวจสอบแล้ว
+
+            # หากไม่พบยูนิตที่จะเลือกให้รีเซ็ต selected_unit และ walkable_tiles
             if not found_unit:
                 self.selected_unit = None
                 self.walkable_tiles = []
@@ -880,6 +1029,7 @@ class Game:
                     if distance <= self.selected_unit.move_range:
                         self.selected_unit.set_destination(tile_x, tile_y, self.path_finder)
                         self.selected_unit.clicked_this_turn = True
+                        self.selected_unit.moved_this_turn = True  # ตั้งค่าสถานะว่ามีการเคลื่อนที่แล้ว
                         self.walkable_tiles = []
                     else:
                         print("ยูนิตนี้ไม่สามารถเดินไปยังจุดนั้นได้ เนื่องจากอยู่นอกระยะการเดิน.")
@@ -888,60 +1038,44 @@ class Game:
                     if distance <= self.selected_unit.create_tower_range:
                         self.create_tower(tile_x, tile_y)
                         self.current_action = None
+                        self.selected_unit.moved_this_turn = True  # ตั้งค่าสถานะว่ามีการสร้างหอคอยแล้ว
 
     # ในฟังก์ชัน update ของเกม
     def update_game(self, delta_time):
-        for monster in self.monsters:
-            monster.move()  # ให้มอนสเตอร์เคลื่อนที่
-            monster.update(delta_time)  # อัปเดตอนิเมชัน
-        
-        for unit in self.units:  # ใช้ self.units แทน self.iso_map.objects
+        for unit in self.player_units:  # ใช้ self.player_units
             unit.update(delta_time)  # อัปเดตยูนิต
 
-    def move_monsters(self):
-        """เคลื่อนที่มอนสเตอร์"""
-        for monster in self.monsters:
-            monster.move()  # เรียกใช้ฟังก์ชัน move() ของมอนสเตอร์
-            monster.update(0)  # อัปเดตอนิเมชันของมอนสเตอร์โดยไม่ใช้ delta_time
+        for monster in self.monsters:  # อัปเดตมอนสเตอร์
+            monster.update()
 
-    def get_target_monster(self, mouse_x, mouse_y):
-        for monster in self.monsters:
-            if (monster.x <= mouse_x <= monster.x + monster.width and
-                monster.y <= mouse_y <= monster.y + monster.height):
-                return monster  # คืนค่ามอนสเตอร์ที่ถูกเลือก
-        return None  # หากไม่มีมอนสเตอร์ที่ถูกเลือก
+        # อัปเดตบอสถ้ามี
+        if self.boss:
+            self.boss.update()  # อัปเดตบอส
+
+            # ตรวจสอบว่าบอสตายหรือไม่
+            if self.boss.health <= 0:
+                print(f"The Boss has been defeated! Dropped {self.boss.drop_value} coins.")
+                # เพิ่มเงินที่ดรอปให้กับผู้เล่น
+                for unit in self.player_units:
+                    if unit.owner == self.boss.owner:  # สมมุติว่าบอสมีแอตทริบิวต์ owner
+                        unit.current_hp += self.boss.drop_value  # หรือเพิ่มให้กับผู้เล่นโดยตรง
+                self.boss = None  # ลบบอสออกจากเกม
     
-    def create_monsters(self, num_monsters=3):
-        slime_sprite_paths = {
-        "idle": "assets/Monster/slime_idle.png",
-        "walk": "assets/Monster/slime_run.png",
-        "die": "assets/Monster/slime_die.png"
-        }
-        """สร้างมอนสเตอร์ในเกมแบบสุ่ม"""
-        if self.monsters_created:
-            return  # หากมอนสเตอร์ถูกสร้างขึ้นแล้ว ให้ไม่ทำอะไร
+    def get_target_object(self, mouse_x, mouse_y):
+        """ค้นหาวัตถุเป้าหมายที่ผู้เล่นคลิก"""
+        tile_x, tile_y = self.iso_map.get_tile_coord_from_screen(mouse_x, mouse_y, self.camera, self.camera.zoom)
 
-        occupied_positions = set()  # ใช้ชุดเพื่อเก็บตำแหน่งที่ถูก occupied
+        # ตรวจสอบว่ามียูนิตอยู่ที่ตำแหน่งที่คลิกหรือไม่
+        for unit in self.player_units:
+            if int(unit.x) == tile_x and int(unit.y) == tile_y:
+                return unit  # คืนค่าหน่วยที่ถูกคลิก
 
-        for _ in range(num_monsters):
-            while True:
-                # สุ่มตำแหน่ง x และ y สำหรับมอนสเตอร์
-                x = random.randint(0, self.GRID_WIDTH - 1)
-                y = random.randint(0, self.GRID_HEIGHT - 1)
+        # ตรวจสอบว่ามีทาวเวอร์อยู่ที่ตำแหน่งที่คลิกหรือไม่
+        for tower in self.towers:
+            if int(tower.x) == tile_x and int(tower.y) == tile_y:
+                return tower  # คืนค่าทาวเวอร์ที่ถูกคลิก
 
-                # ตรวจสอบว่าตำแหน่งนี้ถูก occupied หรือไม่
-                if (x, y) not in occupied_positions:
-                    occupied_positions.add((x, y))  # เพิ่มตำแหน่งลงในชุด
-
-                    # กำหนดขนาดของมอนสเตอร์
-                    width = self.config.TILE_WIDTH  # หรือค่าความกว้างที่คุณต้องการ
-                    height = self.config.TILE_HEIGHT  # หรือค่าความสูงที่คุณต้องการ
-
-                    # สร้างมอนสเตอร์ Slime โดยส่ง width และ height ไปด้วย
-                    self.monsters.append(Monster(x=x, y=y, width=width, height=height, monster_type="Slime", sprite_paths=slime_sprite_paths, tile_size=self.config.TILE_WIDTH, map_width=self.GRID_WIDTH, map_height=self.GRID_HEIGHT))
-                    break  # ออกจากลูป while
-
-        self.monsters_created = True  # ตั้งค่าว่ามอนสเตอร์ถูกสร้างขึ้นแล้ว
+        return None  # ถ้าไม่มีวัตถุที่ถูกคลิก
 
     def select_action(self, action_type):
         current_time = pygame.time.get_ticks()
@@ -970,15 +1104,87 @@ class Game:
         else:
                 print(f"{self.selected_unit.name} has already acted this turn.")
 
+    def game_over(self, current_turn):
+        """จัดการการสิ้นสุดเกม"""
+        print(f"Player {current_turn + 1} has no units left. Game Over!")  # แสดงข้อความเมื่อไม่มีผู้เล่นเหลืออยู่
+
+        # คุณสามารถกำหนดผู้ชนะได้ตามที่ต้องการที่นี่
+        if current_turn == 0:
+            self.winner = 2  # Player 2 ชนะ
+        else:
+            self.winner = 1  # Player 1 ชนะ
+
+        print(f"Player {self.winner} wins!")  # แสดงข้อความผู้ชนะ
+
+    def reset_game(self):
+        """รีเซ็ตสถานะของเกมเพื่อเริ่มใหม่"""
+        self.player_money = [250, 250]  # เงินเริ่มต้นสำหรับผู้เล่น
+        self.current_turn = 0  # เริ่มต้นที่ผู้เล่น 1
+        self.current_round = 1  # เริ่มต้นที่รอบ 1
+        self.player_units.clear()  # ลบยูนิตทั้งหมด
+        self.towers.clear()  # ลบ Tower ทั้งหมด
+        self.monsters.clear()  # ลบมอนสเตอร์ทั้งหมด
+        self.boss = None  # ลบบอส
+        self.create_player_units()  # สร้างยูนิตใหม่สำหรับผู้เล่น
+        self.generate_capture_points(5)  # สร้างจุดยึดครองใหม่
+        self.game_over_screen = False  # รีเซ็ตสถานะหน้าจอเกมจบ
+        print("Game has been reset. Ready to start a new game!")
+
+    def draw_game_over(self):
+        """วาดหน้าจอ Game Over"""
+        # วาดพื้นหลัง
+        game_over_background = pygame.image.load("assets/BG/bg_end_game.png").convert()
+        game_over_background = pygame.transform.scale(game_over_background, (self.screen.get_width(), self.screen.get_height()))
+        self.screen.blit(game_over_background, (0, 0))
+
+        # วาดข้อความ "Game Over"
+        font = pygame.font.Font("assets/Fonts/PixgamerRegular-OVD6A.ttf", 72)
+        game_over_text = font.render("Game Over", True, (255, 0, 0))
+        text_rect = game_over_text.get_rect(center=(self.screen.get_width() // 2, self.screen.get_height() // 2 - 50))
+        self.screen.blit(game_over_text, text_rect)
+
+        # โหลดและเล่นเพลงใหม่
+        pygame.mixer.music.load("assets/sound/Victory.mp3")  # โหลดไฟล์เพลง
+        pygame.mixer.music.play(-1)  # เล่นเพลงในลูป (-1 หมายถึงเล่นตลอดไป)
+
+        # วาดข้อความผู้ชนะตามเทิร์นของผู้เล่น
+        if self.winner is not None:
+            winner_text = font.render(f"Player {self.winner} wins!", True, (255, 255, 0))
+        else:
+            # แสดงข้อความว่าเกมจบลงและผู้เล่นคนไหนที่แพ้
+            winner = 1 if self.current_turn == 0 else 2  # ผู้เล่นที่ชนะ
+            loser = 2 if self.current_turn == 0 else 1  # ผู้เล่นที่แพ้
+            winner_text = font.render(f"Player {winner} wins! Player {loser} has no units left. Game Over!", True, (6, 64, 43))
+
+        # จัดตำแหน่งข้อความผู้ชนะให้แสดงที่ด้านบนกลางของหน้าจอ
+        winner_rect = winner_text.get_rect(center=(self.screen.get_width() // 2, 100))
+        self.screen.blit(winner_text, winner_rect)
+
+        # วาดข้อความเพิ่มเติม เช่น "Press R to Restart" หรือ "Press Q to Quit"
+        restart_text = font.render("Press R to Restart", True, (255, 255, 255))
+        restart_rect = restart_text.get_rect(center=(self.screen.get_width() // 2, self.screen.get_height() // 2 + 50))
+        self.screen.blit(restart_text, restart_rect)
+
+        quit_text = font.render("Press Q to Quit", True, (255, 255, 255))
+        quit_rect = quit_text.get_rect(center=(self.screen.get_width() // 2, self.screen.get_height() // 2 + 120))
+        self.screen.blit(quit_text, quit_rect)
+
+        # ตรวจสอบการกดปุ่มเพื่อรีสตาร์ทหรือออกจากเกม
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_r]:  # กด R เพื่อเริ่มใหม่
+            pygame.mixer.music.stop()  # หยุดเพลงก่อนรีสตาร์ท
+            self.reset_game()  # ฟังก์ชันนี้ต้องถูกสร้างเพื่อรีเซ็ตเกม
+        elif keys[pygame.K_q]:  # กด Q เพื่อออกจากเกม
+            pygame.mixer.music.stop()  # หยุดเพลงก่อนออกจากเกม
+            pygame.quit()  # ปิดเกม
+    
     def run(self):
         """ลูปหลักของเกม"""
         running = True
+        self.game_over_screen = False  # สถานะการแสดงหน้าจอ Game Over
         pygame.mixer.init()  # เริ่มต้น mixer
         pygame.mixer.music.load("assets/sound/playing_music.mp3")  # โหลดเพลง
         pygame.mixer.music.play(-1)  # เล่นเพลงซ้ำตลอดไป
-
-        # สร้างมอนสเตอร์เพียงครั้งเดียวเมื่อเริ่มเกม
-        self.create_monsters()
 
         while running:
             delta_time = self.clock.tick(self.config.FPS) / 1000.0
@@ -1008,6 +1214,10 @@ class Game:
             # อัพเดทสถานะเกม
             self.update_capture_points()
 
+            # ตรวจสอบว่าผู้เล่นมียูนิตเหลืออยู่หรือไม่
+            if not any(unit.current_hp > 0 for unit in self.player_units if unit.owner != self.current_turn):  # ตรวจสอบยูนิตของฝ่ายตรงข้าม
+                self.game_over_screen = True  # ตั้งค่าสถานะให้แสดงหน้าจอ Game Over
+
             # วาดฉากของเกม
             self.screen.fill((0, 0, 0))
             self.draw_map()
@@ -1028,8 +1238,11 @@ class Game:
             if pygame.mouse.get_pressed()[0]:  # ถ้าคลิกซ้าย
                 self.handle_mouse_click(mouse_pos, self.selected_tower)  # ส่งตำแหน่งเมาส์และทาวเวอร์ที่เลือก
 
+            if self.game_over_screen:
+                self.draw_game_over()  # เรียกฟังก์ชันวาดหน้าจอ Game Over
+
             pygame.display.flip()
-    
+
             # รักษาอัตราเฟรมเรต
             self.clock.tick(self.config.FPS)
 
