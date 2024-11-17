@@ -187,7 +187,7 @@ class Game:
                     "archer_sprite": "assets/sprites/unit2_idle_red.png",
                     "owner": 1,
                     "unit_name": "Player 2",
-                    "position": (6, 6)  # ตำแหน่งสำหรับ Player 2
+                    "position": (25, 25)  # ตำแหน่งสำหรับ Player 2
                 }
             ]
 

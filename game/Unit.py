@@ -75,7 +75,7 @@ class Unit:
         elif self.unit_type == UnitType.ARCHER:
             return { 
                 "max_hp": 75, 
-                "attack": 3000, 
+                "attack": 30, 
                 "move_range": 2, 
                 "attack_range": 3,
                 "create_tower_range": 3  # เพิ่มคีย์นี้สำหรับ Archer
