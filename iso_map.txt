@@ -1,0 +1,80 @@
+ระบบคาร์ทีเซียน (Cartesian Coordinate System) คือระบบพิกัดพื้นฐานที่ใช้กันทั่วไป มีลักษณะสำคัญดังนี้:
+
+โครงสร้างพื้นฐาน:
+
+CopyY ↑
+  |
+  |
+  |
+  |_________ X →
+ O(0,0)
+
+แกน X: แนวนอน (ซ้ายไปขวา)
+แกน Y: แนวตั้ง (ล่างขึ้นบน)
+จุดกำเนิด (Origin): O(0,0)
+
+
+การใช้งานในเกม 2D ทั่วไป:
+
+pythonCopy# ตัวอย่างการเคลื่อนที่ในระบบคาร์ทีเซียน
+player_x = 0  # แกน X
+player_y = 0  # แกน Y
+
+# เคลื่อนที่ไปทางขวา
+player_x += 1  # (1,0)
+
+# เคลื่อนที่ขึ้นบน
+player_y += 1  # (1,1)
+
+เปรียบเทียบกับระบบ Isometric:
+
+Copyคาร์ทีเซียน:          Isometric:
+  ↑ Y                    ↗ Y
+  |                    ↗
+  |                  ↗
+  |                ↗
+  +----→ X        +----→ X
+
+การแปลงพิกัด (จากโค้ดของคุณ):
+
+pythonCopy# จากคาร์ทีเซียนเป็น Isometric
+def cart_to_iso(self, x: float, y: float):
+    iso_x = (x - y) * (TILE_WIDTH // 2)
+    iso_y = (x + y) * (TILE_HEIGHT // 2)
+    return iso_x, iso_y
+
+# จาก Isometric เป็นคาร์ทีเซียน
+def iso_to_cart(self, iso_x: float, iso_y: float):
+    cart_x = (iso_x/TILE_WIDTH + iso_y/TILE_HEIGHT) / 2
+    cart_y = (iso_y/TILE_HEIGHT - iso_x/TILE_WIDTH) / 2
+    return cart_x, cart_y
+
+ข้อดีของระบบคาร์ทีเซียน:
+
+
+เข้าใจง่าย
+คำนวณระยะทางตรงไปตรงมา
+เหมาะกับเกม 2D แบบมุมมองด้านบน
+การตรวจสอบการชนง่าย
+
+
+การใช้งานในเกม:
+
+pythonCopy# ตัวอย่างการเคลื่อนที่แบบ 4 ทิศทาง
+directions = {
+    'UP': (0, 1),    # เคลื่อนที่ขึ้น
+    'DOWN': (0, -1),  # เคลื่อนที่ลง
+    'LEFT': (-1, 0),  # เคลื่อนที่ซ้าย
+    'RIGHT': (1, 0)   # เคลื่อนที่ขวา
+}
+
+# การเคลื่อนที่
+def move(direction):
+    dx, dy = directions[direction]
+    new_x = player_x + dx
+    new_y = player_y + dy
+ในเกมของคุณ ระบบคาร์ทีเซียนถูกใช้เป็นพื้นฐานก่อนที่จะแปลงไปเป็น Isometric เพื่อให้:
+
+ง่ายต่อการคำนวณตำแหน่งและการชน
+สะดวกในการจัดการ game logic
+ง่ายต่อการแปลงไป-มาระหว่างระบบพิกัดต่างๆ
