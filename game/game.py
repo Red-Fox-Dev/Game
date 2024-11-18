@@ -274,30 +274,30 @@ class Game:
         font = pygame.font.Font("assets/Fonts/PixgamerRegular-OVD6A.ttf", 20)
     
         # สมมุติว่า Tower มีชื่อและสุขภาพ
-        tower_name_surface = font.render(f"Tower Name: {self.selected_tower.player_id}", True, (255, 255, 255))
+        tower_name_surface = font.render(f"Tower Name: {self.selected_tower.player_id}", True, (0, 0, 0))
         screen.blit(tower_name_surface, (x, y + 50))
 
-        health_surface = font.render(f"Health: {self.selected_tower.health}", True, (255, 255, 255))
+        health_surface = font.render(f"Health: {self.selected_tower.health}", True, (0, 0, 0))
         screen.blit(health_surface, (x, y + 80 + 50))
 
-        attack_power_surface = font.render(f"Attack Power: {self.selected_tower.attack_power}", True, (255, 255, 255))
+        attack_power_surface = font.render(f"Attack Power: {self.selected_tower.attack_power}", True, (0, 0, 0))
         screen.blit(attack_power_surface, (x, y + 110 + 50))
 
-        attack_range_surface = font.render(f"Attack Range: {self.selected_tower.attack_range}", True, (255, 255, 255))
+        attack_range_surface = font.render(f"Attack Range: {self.selected_tower.attack_range}", True, (0, 0, 0))
         screen.blit(attack_range_surface, (x, y + 140 + 50))
 
     def draw_round_display(self):
         """วาดข้อความแสดงรอบของเกมบนหน้าจอ"""
         font = pygame.font.Font("assets/Fonts/PixgamerRegular-OVD6A.ttf", 36)  # ใช้ฟอนต์ที่ต้องการ
         round_text = f"Round: {self.current_round}"  # ข้อความแสดงรอบ
-        text_surface = font.render(round_text, True, (255, 255, 255))  # วาดข้อความด้วยสีขาว
+        text_surface = font.render(round_text, True, (0, 0, 0))  # วาดข้อความด้วยสีขาว
         text_rect = text_surface.get_rect(topright=(self.config.SCREEN_WIDTH - 10, 50))  # จัดตำแหน่งที่มุมขวาบน
         self.screen.blit(text_surface, text_rect)  # วาดข้อความลงบนหน้าจอ
 
     def draw_end_turn_button(self):
         """วาดปุ่ม 'End Turn' บนหน้าจอ"""
         pygame.draw.rect(self.screen, (255, 0, 0), self.end_turn_button)  # วาดปุ่มสีแดง
-        text_surface = self.font.render("End Turn", True, (255, 255, 255))
+        text_surface = self.font.render("End Turn", True, (0, 0, 0))
         text_rect = text_surface.get_rect(center=self.end_turn_button.center)
         self.screen.blit(text_surface, text_rect)
 
@@ -455,7 +455,7 @@ class Game:
         pygame.draw.rect(self.screen, color, scaled_button)
     
         # วาดข้อความ
-        text_surface = self.font.render("Move", True, (255, 255, 255))
+        text_surface = self.font.render("Move", True, (0, 0, 0))
         text_rect = text_surface.get_rect(center=scaled_button.center)
         self.screen.blit(text_surface, text_rect)
 
@@ -502,7 +502,7 @@ class Game:
         pygame.draw.rect(self.screen, color, scaled_button)
     
         # วาดข้อความ
-        text_surface = self.font.render("Attack", True, (255, 255, 255))
+        text_surface = self.font.render("Attack", True, (0, 0, 0))
         text_rect = text_surface.get_rect(center=scaled_button.center)
         self.screen.blit(text_surface, text_rect)
     
@@ -834,7 +834,7 @@ class Game:
         """วาดข้อความแสดงเทิร์นของผู้เล่นบนหน้าจอ"""
         font = pygame.font.Font("assets/Fonts/PixgamerRegular-OVD6A.ttf", 36)  # ใช้ฟอนต์ที่ต้องการและขนาด 36
         turn_text = f"Player {self.current_turn + 1}'s Turn"  # ข้อความแสดงเทิร์น
-        text_surface = font.render(turn_text, True, (255, 255, 255))  # วาดข้อความด้วยสีขาว
+        text_surface = font.render(turn_text, True, (0, 0, 0))  # วาดข้อความด้วยสีขาว
         text_rect = text_surface.get_rect(topright=(self.config.SCREEN_WIDTH - 10, 10))  # จัดตำแหน่งที่มุมขวาบน
         self.screen.blit(text_surface, text_rect)  # วาดข้อความลงบนหน้าจอ
 
@@ -902,7 +902,7 @@ class Game:
         highlight_width = int(32 * self.camera.zoom) 
         highlight_height = int(32 * self.camera.zoom) 
 
-        pygame.draw.rect(self.screen, (255, 255, 0), 
+        pygame.draw.rect(self.screen, (0, 0, 0), 
                      (screen_x, screen_y, highlight_width, highlight_height), 2) 
 
         print("Highlight drawn.")  # Debug print 
@@ -1278,7 +1278,7 @@ class Game:
                 self.game_over_screen = True  # ตั้งค่าสถานะให้แสดงหน้าจอ Game Over
 
             # วาดฉากของเกม
-            self.screen.fill((0, 0, 0))
+            self.screen.fill((204, 229, 255))
             self.draw_map()
             self.draw_move_button()  # วาดปุ่ม "Move"
             self.draw_attack_button()  # วาดปุ่ม "Attack"

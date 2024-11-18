@@ -414,15 +414,3 @@ class Unit:
         # คืนค่า rect โดยใช้พิกัด (x, y) และขนาด (width, height)
         return pygame.Rect(iso_x, iso_y, width, height)
     
-    def handle_left_click(self, mouse_x, mouse_y, tile_x, tile_y):
-        found_unit = False
-        for unit in self.player_units:
-            if int(unit.x) == tile_x and int(unit.y) == tile_y:  # ตรวจสอบพิกัด
-                self.selected_unit = unit  # กำหนดยูนิตที่เลือก
-                self.walkable_tiles = self.get_walkable_tiles(unit)  # อัปเดตช่องที่สามารถเดินได้
-                self.selected_unit.clicked_this_turn = True  # ตั้งค่าสถานะว่ามีการคลิก
-                found_unit = True
-                break  # ออกจากลูปหลังจากเลือกยูนิต
-
-        if not found_unit:
-            self.selected_unit = None
