@@ -244,7 +244,7 @@ class Game:
             positions = random.sample(valid_positions, min(count, len(valid_positions)))
             for x, y in positions:
                 value = random.randint(50, 100)  # สุ่มค่าเงินที่จะได้รับต่อเทิร์น
-                self.capture_points.append(CapturePoint(x, y, value))
+                self.capture_points.append(CapturePoint(x, y))
 
     def handle_mouse_click(self, mouse_pos, tower):
         """ตรวจสอบการคลิกที่ปุ่มสร้างยูนิต"""
@@ -1242,6 +1242,7 @@ class Game:
         self.win_music_played = False  # สถานะการเล่นเพลงชนะ
         pygame.mixer.init()  # เริ่มต้น mixer
         pygame.mixer.music.load("sound/playing_music.mp3")  # โหลดเพลง
+        pygame.mixer.music.set_volume(0.2)  # ลดเสียงเพลงพื้นหลังลงเหลือ 50%
         pygame.mixer.music.play(-1)  # เล่นเพลงซ้ำตลอดไป
 
         while running:
