@@ -1236,7 +1236,7 @@ class Game:
     
     def run(self):
         """ลูปหลักของเกม"""
-        pygame.display.set_caption("WHAT!!!!!!!!")  # เปลี่ยนชื่อเกมที่แสดงในหน้าต่าง
+        pygame.display.set_caption("WAHT!!  strategy GOOD GAMING cheir")  # เปลี่ยนชื่อเกมที่แสดงในหน้าต่าง
         running = True
         self.game_over_screen = False  # สถานะการแสดงหน้าจอ Game Over
         self.win_music_played = False  # สถานะการเล่นเพลงชนะ
@@ -1278,7 +1278,7 @@ class Game:
                 self.game_over_screen = True  # ตั้งค่าสถานะให้แสดงหน้าจอ Game Over
 
             # วาดฉากของเกม
-            self.screen.fill((204, 229, 255))
+            self.screen.fill((0, 151, 167))
             self.draw_map()
             self.draw_move_button()  # วาดปุ่ม "Move"
             self.draw_attack_button()  # วาดปุ่ม "Attack"
