@@ -5,7 +5,7 @@ from .SpriteSheetLoader import SpriteSheetLoader
 from enum import Enum
 from .Boss import Boss
 from .monster import Monster
-
+from .iso_map import IsometricMap
 # กำหนดประเภทของยูนิต
 class UnitType(Enum):
     SOLDIER = "soldier"
@@ -42,6 +42,7 @@ class Unit:
         self.owner = owner
         self.name = name
         self.action_text = ""
+        self.targets = []
         self.has_actioned = False
         self.clicked_this_turn = False
         self.move_range = move_range
@@ -61,7 +62,9 @@ class Unit:
         self.attack_frames = self.load_attack_animation()  # โหลดแอนิเมชันการโจมตี
         self.attack_frame_index = 0
         self.is_attacking = False
-     
+        self.attack_sound = None  # เริ่มต้นด้วย None
+        self.load_attack_sound()  # โหลดเสียงโจมตีเมื่อสร้างยูนิต
+
     def get_info(self):
         """คืนค่าข้อมูลเกี่ยวกับยูนิต"""
         if self.unit_type == UnitType.SOLDIER:
@@ -180,7 +183,7 @@ class Unit:
             self.path.pop(0)  # ลบตำแหน่งปัจจุบันออก
             self.moving = True
 
-    def update(self, delta_time):
+    def update(self, delta_time, all_units, boss, monsters):
         if self.path and self.moving:
             next_pos = self.path[0]
             target_x, target_y = next_pos
@@ -203,6 +206,7 @@ class Unit:
                 move_y = (dy / distance) * self.speed * delta_time
                 self.x += move_x
                 self.y += move_y
+        self.update_targets(all_units, boss, monsters)
 
         # อัปเดตเฟรม idle
         current_time = pygame.time.get_ticks()
@@ -258,6 +262,7 @@ class Unit:
         hp_bar_x = screen_x
         hp_bar_y = screen_y - 10 * camera.zoom  # ปรับตำแหน่ง HP Bar ให้อยู่ด้านบนของยูนิต
         self.draw_hp_bar(screen, hp_bar_x, hp_bar_y, self.max_hp, self.current_hp, camera.zoom)  # ส่งค่าซูมไปยังฟังก์ชัน
+        self.draw_attackable_targets(screen, iso_map, camera, config)
 
     def load_attack_animation(self):
         """โหลดแอนิเมชันการโจมตีตามประเภทของยูนิตและเจ้าของ"""
@@ -283,6 +288,22 @@ class Unit:
                 return SpriteSheetLoader.load_sprite_sheet("assets/sprites/House-red-attack.png", frame_width=32, frame_height=32)
         return []
     
+    def load_attack_sound(self):
+        """โหลดเสียงโจมตีตามประเภทของยูนิต"""
+        if self.unit_type == UnitType.SOLDIER:
+            self.attack_sound = pygame.mixer.Sound("sound/sword.wav")
+        elif self.unit_type == UnitType.ARCHER:
+            self.attack_sound = pygame.mixer.Sound("sound/arrow.wav")
+        elif self.unit_type == UnitType.MAGE:
+            self.attack_sound = pygame.mixer.Sound("sound/magic.wav")
+        elif self.unit_type == UnitType.CAVALRY:
+            self.attack_sound = pygame.mixer.Sound("sound/spear.wav")
+
+    def play_attack_sound(self):
+        """เล่นเสียงโจมตีถ้ามีการโหลดเสียงแล้ว"""
+        if self.attack_sound:
+            self.attack_sound.play()
+
     def attack(self, target, game):
         """โจมตีเป้าหมาย"""
         if self.attacked_this_turn:  # ตรวจสอบว่ามีการโจมตีในเทิร์นนี้หรือไม่
@@ -295,25 +316,39 @@ class Unit:
                 print(f"{self.name} attacked the Boss! Boss's HP is now {target.health}.")
                 self.attacked_this_turn = True  # ตั้งค่าสถานะว่าได้โจมตีแล้ว
                 self.is_attacking = True  # เริ่มแอนิเมชันการโจมตี
+            
+                # เล่นเสียงโจมตี
+                self.play_attack_sound()
+
                 if target.is_dead:
                     print(f"Boss has been defeated! Dropped {target.drop_value} coins.")
                     game.player_money[self.owner] += target.drop_value
                     game.boss = None
+
         elif isinstance(target, Monster):
             if self.is_in_range(target):
                 dropped_money = target.take_damage(self.attack_value)
                 print(f"{self.name} attacked the {target.name}! {target.name}'s HP is now {target.health}.")
                 self.attacked_this_turn = True  # ตั้งค่าสถานะว่าได้โจมตีแล้ว
                 self.is_attacking = True  # เริ่มแอนิเมชันการโจมตี
+            
+                # เล่นเสียงโจมตี
+                self.play_attack_sound()
+
                 if target.is_dead:
                     print(f"{target.name} has been defeated! Dropped {dropped_money} coins.")
                     game.player_money[self.owner] += dropped_money
                     game.monsters.remove(target)
+
         else:
             if self.is_in_range(target):
                 self.is_attacking = True  # เริ่มแอนิเมชันการโจมตี
                 target.current_hp -= self.attack_value
                 print(f"{self.name} attacked {target.name}! {target.name}'s HP is now {target.current_hp}.")
+            
+                # เล่นเสียงโจมตี
+                self.play_attack_sound()
+
                 if target.current_hp <= 0:
                     print(f"{target.name} has been destroyed!")
     
@@ -325,3 +360,69 @@ class Unit:
         """ตรวจสอบว่าเป้าหมายอยู่ในระยะการโจมตีหรือไม่"""
         distance = self.calculate_distance(target.x, target.y)
         return distance <= self.attack_range
+    
+    def draw_attackable_targets(self, screen, iso_map, camera, config):
+        """วาด highlight สำหรับ tile ที่สามารถโจมตีได้"""
+        for target in self.targets:
+            if self.is_in_range(target):
+                # แปลงพิกัดเป้าหมายเป็นพิกัด tile
+                tile_x, tile_y = int(target.x), int(target.y)
+            
+                # แปลงพิกัด tile เป็นพิกัดไอโซเมตริก
+                iso_x, iso_y = iso_map.cart_to_iso(tile_x, tile_y)
+                screen_x = iso_x * camera.zoom + config.OFFSET_X + camera.position.x
+                screen_y = iso_y * camera.zoom + config.OFFSET_Y + camera.position.y
+
+                # กำหนดจุดสำหรับวาดกรอบรูปสี่เหลี่ยมข้าวหลามตัด
+                points = [
+                    (screen_x, screen_y + (config.TILE_HEIGHT * camera.zoom) // 2),
+                    (screen_x + (config.TILE_WIDTH * camera.zoom) // 2, screen_y),
+                    (screen_x + (config.TILE_WIDTH * camera.zoom), 
+                     screen_y + (config.TILE_HEIGHT * camera.zoom) // 2),
+                    (screen_x + (config.TILE_WIDTH * camera.zoom) // 2, 
+                     screen_y + (config.TILE_HEIGHT * camera.zoom))
+                ]
+
+                # วาดกรอบ
+                pygame.draw.lines(screen, (255, 0, 0), True, points, 3)  # สีแดง ความหนา 3 พิกเซล
+
+
+    def update_targets(self, all_units, boss, monsters):
+        """อัปเดตเป้าหมายที่สามารถโจมตีได้"""
+        self.targets = []
+    
+        # เพิ่มยูนิตของฝ่ายตรงข้าม
+        for unit in all_units:
+            if unit.owner != self.owner:
+                self.targets.append(unit)
+    
+        # เพิ่มบอสถ้ามี
+        if boss and not boss.is_dead:
+            self.targets.append(boss)
+    
+        # เพิ่มมอนสเตอร์
+        for monster in monsters:
+            if not monster.is_dead:
+                self.targets.append(monster)
+    
+    def get_rect(self):
+        """คืนค่า rect สำหรับยูนิต"""
+        iso_x, iso_y = self.x, self.y  # ใช้พิกัด Cartesian ของยูนิต
+        width = self.image.get_width()  # ความกว้างของภาพยูนิต
+        height = self.image.get_height()  # ความสูงของภาพยูนิต
+
+        # คืนค่า rect โดยใช้พิกัด (x, y) และขนาด (width, height)
+        return pygame.Rect(iso_x, iso_y, width, height)
+    
+    def handle_left_click(self, mouse_x, mouse_y, tile_x, tile_y):
+        found_unit = False
+        for unit in self.player_units:
+            if int(unit.x) == tile_x and int(unit.y) == tile_y:  # ตรวจสอบพิกัด
+                self.selected_unit = unit  # กำหนดยูนิตที่เลือก
+                self.walkable_tiles = self.get_walkable_tiles(unit)  # อัปเดตช่องที่สามารถเดินได้
+                self.selected_unit.clicked_this_turn = True  # ตั้งค่าสถานะว่ามีการคลิก
+                found_unit = True
+                break  # ออกจากลูปหลังจากเลือกยูนิต
+
+        if not found_unit:
+            self.selected_unit = None

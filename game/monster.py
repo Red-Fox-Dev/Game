@@ -1,5 +1,4 @@
 import pygame
-import random
 from .SpriteSheetLoader import SpriteSheetLoader 
 
 class Monster:
@@ -124,3 +123,9 @@ class Monster:
         iso_x = (x - y) * (32 // 2)  # ปรับตามขนาดของ tile
         iso_y = (x + y) * (16 // 2)  # ปรับตามขนาดของ tile
         return iso_x, iso_y
+    
+    def get_rect(self):
+        """คืนค่า rect สำหรับ Monster"""
+        width = self.image.get_width()  # ความกว้างของภาพมอนสเตอร์
+        height = self.image.get_height()  # ความสูงของภาพมอนสเตอร์
+        return pygame.Rect(self.x, self.y, width, height)  # คืนค่า rect

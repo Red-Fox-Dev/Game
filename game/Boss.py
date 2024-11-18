@@ -114,3 +114,9 @@ class Boss:
             return self.drop_value  # คืนค่าเงินที่ดรอปเมื่อบอสถูกฆ่า
         print(f"Boss takes {damage} damage! Current health: {self.health}")
         return 0  # คืนค่า 0 ถ้ายังไม่ตาย
+    
+    def get_rect(self):
+        """คืนค่า rect สำหรับ Boss"""
+        width = self.image.get_width()  # ความกว้างของภาพบอส
+        height = self.image.get_height()  # ความสูงของภาพบอส
+        return pygame.Rect(self.x, self.y, width, height)  # คืนค่า rect

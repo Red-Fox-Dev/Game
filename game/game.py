@@ -14,6 +14,7 @@ from .Tower import Tower
 from .monster import Monster
 from .Boss import Boss
 
+
 class Game:
     def __init__(self, config: GameConfig):
         pygame.init()
@@ -47,19 +48,22 @@ class Game:
         self.monsters = []  # สร้างตัวแปรสำหรับมอนสเตอร์
         self.monster_count = 0  # จำนวนมอนสเตอร์ที่มีอยู่
         self.turns_since_last_spawn = 0  # จำนวนเทิร์นตั้งแต่การเกิดใหม่ครั้งล่าสุด
+        self.boss_spawn_sound = pygame.mixer.Sound("sound/Boss_spawn.mp3")
+        self.boss_spawn_sound.set_volume(0.3)
+        self.turns_since_last_boss_move = 0  # ตัวแปรใหม่สำหรับติดตามจำนวนเทิร์นที่บอสไม่เคลื่อนที่
 
         self.move_button_animation = {
         'scale': 1.0,
         'color': (0, 255, 0),
         'start_time': 0,
-        'duration': 300,  # ระยะเวลา animation
+        'duration': 500,  # ระยะเวลา animation
         'active': False
         }
         self.attack_button_animation = {
             'scale': 1.0,
             'color': (255, 165, 0),
             'start_time': 0,
-            'duration': 300,
+            'duration': 500,
             'active': False
         }
 
@@ -146,11 +150,17 @@ class Game:
 
         # เพิ่มจำนวนเทิร์นที่ผ่านไป
         self.turns_since_last_spawn += 1
+        self.turns_since_last_boss_move += 1  # เพิ่มจำนวนเทิร์นที่บอสไม่เคลื่อนที่
 
         # ตรวจสอบว่าเป็นเทิร์นที่ 2 หรือไม่
         if self.turns_since_last_spawn >= 2:
             self.spawn_monster()  # เรียกฟังก์ชันเพื่อสร้างมอนสเตอร์ใหม่
             self.turns_since_last_spawn = 0  # รีเซ็ตจำนวนเทิร์นที่ผ่านไป
+
+        # ตรวจสอบว่าเป็นเทิร์นที่ 2 หรือไม่เพื่อให้บอสเคลื่อนที่
+        if self.turns_since_last_boss_move >= 4:
+            self.move_boss()  # เรียกฟังก์ชันเพื่อเคลื่อนที่บอส
+            self.turns_since_last_boss_move = 0  # รีเซ็ตจำนวนเทิร์นที่บอสไม่เคลื่อนที่
 
         # เปลี่ยน turn ระหว่างผู้เล่น
         self.current_turn = (self.current_turn + 1) % 2  # เปลี่ยน turn ระหว่างผู้เล่น 0 และ 1
@@ -495,6 +505,24 @@ class Game:
         text_surface = self.font.render("Attack", True, (255, 255, 255))
         text_rect = text_surface.get_rect(center=scaled_button.center)
         self.screen.blit(text_surface, text_rect)
+    
+    def move_boss(self):
+        """ฟังก์ชันเพื่อเคลื่อนที่บอส"""
+        if self.boss and not self.boss.is_dead:  # ตรวจสอบว่าบอสยังมีชีวิตอยู่
+            # สุ่มเลือกทิศทางการเคลื่อนที่
+            direction = random.choice(self.path_finder.directions)  # เลือกทิศทางแบบสุ่ม
+
+            new_x = self.boss.x + direction[0]  # อัปเดตตำแหน่ง X
+            new_y = self.boss.y + direction[1]  # อัปเดตตำแหน่ง Y
+
+            # ตรวจสอบว่าตำแหน่งใหม่อยู่ในขอบเขตของแผนที่
+            if (0 <= new_x < self.iso_map.tmx_data.width) and (0 <= new_y < self.iso_map.tmx_data.height):
+                # ตรวจสอบว่าตำแหน่งใหม่เดินได้หรือไม่
+                if self.path_finder.is_walkable((new_x, new_y)):
+                    # อัปเดตตำแหน่งบอส
+                    self.boss.x = new_x
+                    self.boss.y = new_y
+                    print(f"Boss moved to position: ({new_x}, {new_y})")  # แสดงข้อความยืนยันการเคลื่อนที่
 
     def move_monsters(self):
         for monster in self.monsters:
@@ -568,8 +596,9 @@ class Game:
             if valid_positions:
                 x, y = random.choice(valid_positions)  # สุ่มตำแหน่งจาก valid_positions
                 self.boss = Boss(x, y)  # สร้างบอสที่ตำแหน่งที่สุ่มได้
-                print(f"Boss spawned at position: ({x}, {y})")  # แสดงพิกัดที่บอสเกิด
-                self.draw_message("Boss has spawned!", duration=500)  # แสดงข้อความเมื่อบอสเกิด
+                self.boss_spawn_sound.play()
+                print(f"Among US!! spawned at position: ({x}, {y})")  # แสดงพิกัดที่บอสเกิด
+                self.draw_message("Among US!! has spawned!", duration=500)  # แสดงข้อความเมื่อบอสเกิด
 
     def is_near_units(self, x, y, distance=2):
         """ตรวจสอบว่ามียูนิตใกล้ตำแหน่งที่กำหนดหรือไม่"""
@@ -749,16 +778,10 @@ class Game:
                         screen_y = iso_y * self.camera.zoom + self.config.OFFSET_Y + self.camera.position.y
                         self.screen.blit(tile, (screen_x, screen_y))
                         
-                        # เน้นกระเบื้องที่ถูกเลือกหากตรงกับพิกัดปัจจุบัน
-                        if (x, y) == self.iso_map.selected_tile:
-                            self.draw_tile_highlight(x, y)
+                       
         
         # วาด highlight ช่องที่เดินได้
         self.draw_walkable_tiles()  
-
-        # วาดยูนิตทั้งหมด
-        for unit in self.units:  # ใช้ self.units แทน self.iso_map.objects
-            unit.draw(self.screen, self.iso_map, self.camera, self.config)
 
         for tower in self.towers:
             tower.draw(self.screen, self.camera, self.config)  # วาด Tower
@@ -773,10 +796,21 @@ class Game:
         for obj in self.iso_map.objects:
             if isinstance(obj, Unit):  # ตรวจสอบว่า obj เป็น Unit หรือไม่
                 obj.draw(self.screen, self.iso_map, self.camera, self.config)
+        
+        for unit in self.units :  # ใช้ self.units หรือ self.iso_map.objects
+            unit.draw(self.screen, self.iso_map, self.camera, self.config)
+        
+        # ตรวจสอบว่าเทิร์นของผู้เล่นตรงกับยูนิตที่ถูกเลือก
+        if self.selected_unit and self.selected_unit.clicked_this_turn and self.selected_unit.owner == self.current_turn:
+            self.selected_unit.draw_attackable_targets(self.screen, self.iso_map, self.camera, self.config)
 
         # วาด highlight unit ที่เลือก
         if self.selected_unit:
             self.draw_unit_highlight(self.selected_unit)
+
+        # วาด highlight กระเบื้องที่ถูกเลือก
+        if self.iso_map.selected_tile:
+            self.draw_tile_highlight(*self.iso_map.selected_tile)
 
         # วาดบอสถ้ามี
         if self.boss:
@@ -913,8 +947,8 @@ class Game:
                     self.handle_right_click(tile_x, tile_y)
 
         # Update objects
-        for unit in self.player_units:
-            unit.update(delta_time)
+        for unit in self.player_units:  # ใช้ self.player_units หรือ self.units ตามที่คุณมี
+            unit.update(delta_time, self.player_units, self.boss, self.monsters)  # ส่ง all_units เป็นอาร์กิวเมนต์ที่สอง
 
         self.camera.handle_input(pygame.key.get_pressed(), events)
 
@@ -1052,6 +1086,10 @@ class Game:
                 self.selected_unit = None
                 self.walkable_tiles = []
 
+
+
+
+
     def handle_right_click(self, tile_x, tile_y):
         if self.selected_unit:
             if not self.selected_unit.moved_this_turn:  # ตรวจสอบว่ายูนิตยังไม่เคลื่อนที่ในเทิร์นนี้
@@ -1072,25 +1110,29 @@ class Game:
                         self.selected_unit.moved_this_turn = True  # ตั้งค่าสถานะว่ามีการสร้างหอคอยแล้ว
 
     # ในฟังก์ชัน update ของเกม
-    def update_game(self, delta_time):
-        for unit in self.player_units:  # ใช้ self.player_units
-            unit.update(delta_time)  # อัปเดตยูนิต
+    def update_game(self, delta_time): 
+        for unit in self.player_units:  # ใช้ self.player_units 
+            unit.update(delta_time)  # อัปเดตยูนิต 
 
-        for monster in self.monsters:  # อัปเดตมอนสเตอร์
-            monster.update()
+        for monster in self.monsters:  # อัปเดตมอนสเตอร์ 
+            monster.update() 
 
-        # อัปเดตบอสถ้ามี
-        if self.boss:
-            self.boss.update()  # อัปเดตบอส
+        # อัปเดตบอสถ้ามี 
+        if self.boss: 
+            self.boss.update()  # อัปเดตบอส 
 
-            # ตรวจสอบว่าบอสตายหรือไม่
-            if self.boss.health <= 0:
-                print(f"The Boss has been defeated! Dropped {self.boss.drop_value} coins.")
-                # เพิ่มเงินที่ดรอปให้กับผู้เล่น
-                for unit in self.player_units:
-                    if unit.owner == self.boss.owner:  # สมมุติว่าบอสมีแอตทริบิวต์ owner
-                        unit.current_hp += self.boss.drop_value  # หรือเพิ่มให้กับผู้เล่นโดยตรง
-                self.boss = None  # ลบบอสออกจากเกม
+            # ตรวจสอบว่าบอสต้องเคลื่อนที่หรือไม่
+            if self.current_round % 4 == 0:  # ทุกๆ 4 รอบ
+                self.move_boss()  # ให้บอสเคลื่อนที่
+
+            # ตรวจสอบว่าบอสตายหรือไม่ 
+            if self.boss.health <= 0: 
+                print(f"The Boss has been defeated! Dropped {self.boss.drop_value} coins.") 
+                # เพิ่มเงินที่ดรอปให้กับผู้เล่น 
+                for unit in self.player_units: 
+                    if unit.owner == self.boss.owner:  # สมมุติว่าบอสมีแอตทริบต์ owner 
+                        unit.current_hp += self.boss.drop_value  # หรือเพิ่มให้กับผู้เล่นโดยตรง 
+                self.boss = None  # ลบบอสออกจากเกม 
     
     def get_target_object(self, mouse_x, mouse_y):
         """ค้นหาวัตถุเป้าหมายที่ผู้เล่นคลิก"""
@@ -1210,7 +1252,7 @@ class Game:
             # อัพเดตสถานะของยูนิต
             for obj in self.iso_map.objects:
                 if isinstance(obj, Unit):  # ตรวจสอบว่า obj เป็น Unit หรือไม่
-                    obj.update(delta_time)  # อัปเดตยูนิต
+                    obj.update(delta_time, self.player_units, self.boss, self.monsters)  # อัปเดตยูนิต
 
             for event in events:
                 if event.type == pygame.QUIT:

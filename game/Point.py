@@ -3,12 +3,11 @@ import math
 from .Unit import Unit
 
 class CapturePoint:
-    def __init__(self, x, y, value=10):
+    def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.value = value  # เงินต่อวินาที
         self.owner = None
-        self.value = 100  # ตัวอย่างค่า value ของจุดยึดครอง
+        self.value = 50  # ตัวอย่างค่า value ของจุดยึดครอง
         self.has_received_income = False  # สถานะว่าได้รับเงินในเทิร์นนี้หรือยัง
         self.capture_progress = 0
         self.capture_speed = 1
